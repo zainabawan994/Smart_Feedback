@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Bricolage_Grotesque, IBM_Plex_Mono, Noto_Nastaliq_Urdu } from "next/font/google";
 import "./globals.css";
+import ThemeToggle, { THEME_SCRIPT } from "@/components/ThemeToggle";
 
 const fraunces = Fraunces({ variable: "--font-fraunces", subsets: ["latin"], axes: ["SOFT", "opsz"] });
 const grotesk = Bricolage_Grotesque({ variable: "--font-grotesk", subsets: ["latin"] });
@@ -14,8 +15,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${grotesk.variable} ${mono.variable} ${nastaliq.variable} antialiased`}>
-      <body className="min-h-dvh">{children}</body>
+    // suppressHydrationWarning: the head script sets data-theme before React loads.
+    <html lang="en" suppressHydrationWarning className={`${fraunces.variable} ${grotesk.variable} ${mono.variable} ${nastaliq.variable} antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
+      <body className="min-h-dvh">
+        {children}
+        <ThemeToggle />
+      </body>
     </html>
   );
 }
