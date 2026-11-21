@@ -21,7 +21,7 @@ function Severity({ s }: { s: "major" | "minor" }) {
 
 export default async function IssuesPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { business } = await requireOwnerPage(slug);
+  const { business, readOnly } = await requireOwnerPage(slug);
   const [drafts, insight] = await Promise.all([listDrafts(slug, 500), getInsight(slug)]);
   const a = analyze(drafts);
   const majors = a.issues.filter((i) => i.severity === "major");
@@ -55,7 +55,7 @@ export default async function IssuesPage({ params }: { params: Promise<{ slug: s
               The open-source model reads your whole feedback history, groups similar complaints and suggests one fix for each. Numbers come from your real drafts.
             </p>
           </div>
-          {a.unhappy > 0 && <AnalyzeButton slug={slug} label={insight ? "Re-analyze" : "Analyze with AI"} />}
+          {a.unhappy > 0 && !readOnly && <AnalyzeButton slug={slug} label={insight ? "Re-analyze" : "Analyze with AI"} />}
         </div>
 
         {!insight ? (

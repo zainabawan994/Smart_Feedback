@@ -158,3 +158,26 @@ end
 $$;
 revoke execute on function hit_rate_limit(text, int, int) from public, anon, authenticated;
 grant execute on function hit_rate_limit(text, int, int) to service_role;
+
+-- Super-admin controls: pause a business and record its plan (set by the platform owner, not the business owner).
+alter table businesses add column if not exists suspended boolean not null default false;
+alter table businesses add column if not exists plan text check (plan in ('monthly','6months','yearly'));
+alter table businesses add column if not exists plan_expires_at timestamptz;
+
+-- Super-admin list: every business with its owner's email and activity counts, in one call.
+create or replace function platform_businesses() returns table (
+  slug text, name text, city text, kind text, google_review_url text, menu text[], highlights jsonb, default_lang text,
+  owner_id uuid, suspended boolean, plan text, plan_expires_at timestamptz, owner_email text, created_at timestamptz,
+  visits bigint, drafts bigint, google bigint, last_activity timestamptz
+) language sql stable as $$
+  select b.slug, b.name, b.city, b.kind, b.google_review_url, b.menu, b.highlights, b.default_lang,
+         b.owner_id, b.suspended, b.plan, b.plan_expires_at, u.email, b.created_at,
+         (select count(*) from events e where e.slug = b.slug and e.type = 'visit'),
+         (select count(*) from drafts d where d.slug = b.slug),
+         (select count(*) from events e where e.slug = b.slug and e.type = 'google'),
+         (select max(e.created_at) from events e where e.slug = b.slug)
+  from businesses b left join users u on u.id = b.owner_id
+  order by b.created_at desc
+$$;
+revoke execute on function platform_businesses() from public, anon, authenticated;
+grant execute on function platform_businesses() to service_role;

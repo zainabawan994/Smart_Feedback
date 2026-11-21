@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     allow("generate-biz", slug, 300, 3600),
   ]);
   if (!ipOk) return tooMany();
-  if (!b) return Response.json({ error: "Unknown business" }, { status: 404 });
+  if (!b || b.suspended) return Response.json({ error: "Unknown business" }, { status: 404 });
   if (!bizOk) return tooMany();
 
   const sentiment = SENTIMENTS.includes(body.sentiment) ? (body.sentiment as Sentiment) : null;

@@ -18,7 +18,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-export default function SettingsForm({ initial }: { initial: Business }) {
+export default function SettingsForm({ initial, readOnly = false }: { initial: Business; readOnly?: boolean }) {
   const router = useRouter();
   const [b, setB] = useState(initial);
   const [menu, setMenu] = useState(initial.menu.join("\n"));
@@ -103,7 +103,7 @@ export default function SettingsForm({ initial }: { initial: Business }) {
       </section>
 
       <div className="sticky bottom-0 -mx-4 flex items-center gap-4 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border">
-        <button disabled={saving} className="rounded-full bg-ink px-6 py-3 font-medium text-paper transition hover:opacity-90 disabled:opacity-50">
+        <button disabled={saving || readOnly} className="rounded-full bg-ink px-6 py-3 font-medium text-paper transition hover:opacity-90 disabled:opacity-50">
           {saving ? "Saving…" : "Save changes"}
         </button>
         {status && (

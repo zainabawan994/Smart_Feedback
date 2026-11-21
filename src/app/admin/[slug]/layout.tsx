@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { requireOwnerPage } from "@/lib/auth";
+import { isSuperAdmin, requireOwnerPage } from "@/lib/auth";
 import { listBusinesses } from "@/lib/store";
 import { logout } from "@/lib/actions";
 import Nav from "./Nav";
 
 export default async function AdminLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { user, business } = await requireOwnerPage(slug);
+  const { user, business, readOnly } = await requireOwnerPage(slug);
   const all = await listBusinesses(user.id);
 
   const switcher = (
@@ -48,6 +48,11 @@ export default async function AdminLayout({ children, params }: { children: Reac
             Customer page ↗
           </a>
           <div className="dashed my-4" />
+          {isSuperAdmin(user) && (
+            <Link href="/superadmin" className="mb-3 block rounded-xl bg-ink px-3 py-2 text-center text-sm text-paper transition hover:opacity-90">
+              Super admin
+            </Link>
+          )}
           <p className="truncate text-xs text-muted" title={user.email}>
             {user.email}
           </p>
@@ -57,7 +62,25 @@ export default async function AdminLayout({ children, params }: { children: Reac
         </div>
       </aside>
       <div className="min-w-0">
-        {children}
+        {readOnly && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-mustard bg-card px-4 py-2.5 text-sm sm:px-8">
+            <span>
+              <span className="font-medium">Super-admin view.</span> You&apos;re looking at {business.name}&apos;s desk. Nothing can be changed here.
+            </span>
+            <Link href={`/superadmin/${slug}`} className="underline underline-offset-4">
+              Manage this business →
+            </Link>
+          </div>
+        )}
+        {business.suspended && !readOnly ? (
+          <div className="mx-auto max-w-xl px-4 py-16 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-plum">Account paused</p>
+            <h1 className="mt-3 font-display text-4xl tracking-tight">{business.name} is suspended</h1>
+            <p className="mt-3 text-muted">Your customer page is switched off and the desk is paused. Contact SmartFeedback support to turn it back on.</p>
+          </div>
+        ) : (
+          children
+        )}
         <div className="flex items-center justify-between border-t border-line px-4 py-4 text-sm lg:hidden">
           <a href={`/r/${slug}`} target="_blank" className="underline underline-offset-4">
             Customer page ↗

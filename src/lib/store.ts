@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./password.ts";
-import { TIME_ZONE } from "./options.ts";
+import { TIME_ZONE, type Plan } from "./options.ts";
 
 export type Sentiment = "positive" | "neutral" | "negative";
 export type Lang = "en" | "ur" | "roman";
@@ -18,7 +18,16 @@ export type Business = {
   highlights: Record<Sentiment, string[]>; // options shown per sentiment
   defaultLang: Lang;
   ownerId?: string | null;
+  // Set only by the super-admin, never by the owner's settings form.
+  suspended?: boolean; // true = customer page and owner desk are switched off
+  plan?: Plan | null;
+  planExpiresAt?: string | null; // ISO time
 };
+
+/** One row of the super-admin's business list. */
+export type PlatformBusiness = Business & { ownerEmail: string | null; createdAt: string | null; visits: number; drafts: number; google: number; lastActivity: string | null };
+/** One row of the super-admin's owner list. */
+export type PlatformUser = { id: string; email: string; emailVerified: boolean; createdAt: string; businesses: number };
 
 export type User = {
   id: string;
@@ -85,10 +94,10 @@ async function sb(pathAndQuery: string, init: RequestInit = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-type Row = { slug: string; name: string; city: string; kind: string; google_review_url: string; menu: string[]; highlights: Business["highlights"]; default_lang: Lang; owner_id: string | null };
-const fromRow = (r: Row): Business => ({ slug: r.slug, name: r.name, city: r.city, kind: r.kind, googleReviewUrl: r.google_review_url, menu: r.menu, highlights: r.highlights, defaultLang: r.default_lang, ownerId: r.owner_id });
+type Row = { slug: string; name: string; city: string; kind: string; google_review_url: string; menu: string[]; highlights: Business["highlights"]; default_lang: Lang; owner_id: string | null; suspended?: boolean; plan?: Plan | null; plan_expires_at?: string | null };
+const fromRow = (r: Row): Business => ({ slug: r.slug, name: r.name, city: r.city, kind: r.kind, googleReviewUrl: r.google_review_url, menu: r.menu, highlights: r.highlights, defaultLang: r.default_lang, ownerId: r.owner_id, suspended: r.suspended ?? false, plan: r.plan ?? null, planExpiresAt: r.plan_expires_at ?? null });
 const toRow = (b: Partial<Business>) => {
-  const r: Partial<Row> = { slug: b.slug, name: b.name, city: b.city, kind: b.kind, google_review_url: b.googleReviewUrl, menu: b.menu, highlights: b.highlights, default_lang: b.defaultLang, owner_id: b.ownerId };
+  const r: Partial<Row> = { slug: b.slug, name: b.name, city: b.city, kind: b.kind, google_review_url: b.googleReviewUrl, menu: b.menu, highlights: b.highlights, default_lang: b.defaultLang, owner_id: b.ownerId, suspended: b.suspended, plan: b.plan, plan_expires_at: b.planExpiresAt };
   for (const k of Object.keys(r) as (keyof Row)[]) if (r[k] === undefined) delete r[k];
   return r;
 };
@@ -305,6 +314,44 @@ export async function rateLimit(key: string, max: number, windowSec: number): Pr
   const next = !cur || cur.reset < now ? { n: 1, reset: now + windowSec * 1000 } : { n: cur.n + 1, reset: cur.reset };
   localHits.set(key, next);
   return next.n <= max;
+}
+
+/* ---- super-admin: whole platform ---- */
+
+export async function listPlatformBusinesses(): Promise<PlatformBusiness[]> {
+  if (useSupabase) {
+    // One SQL call with per-business counts (platform_businesses in schema.sql); no raw events leave the database.
+    const rows: (Row & { owner_email: string | null; created_at: string; visits: number; drafts: number; google: number; last_activity: string | null })[] = await sb("rpc/platform_businesses", { method: "POST", body: "{}" });
+    return rows.map((r) => ({ ...fromRow(r), ownerEmail: r.owner_email, createdAt: r.created_at, visits: Number(r.visits), drafts: Number(r.drafts), google: Number(r.google), lastActivity: r.last_activity }));
+  }
+  const db = await load();
+  return Object.values(db.businesses).map((b) => {
+    const ev = db.events[b.slug] ?? [];
+    return {
+      ...b,
+      suspended: b.suspended ?? false,
+      ownerEmail: (b.ownerId && db.users[b.ownerId]?.email) || null,
+      createdAt: null,
+      visits: ev.filter((e) => e.type === "visit").length,
+      drafts: (db.drafts[b.slug] ?? []).length,
+      google: ev.filter((e) => e.type === "google").length,
+      lastActivity: ev[0]?.at ?? null,
+    };
+  });
+}
+
+export async function listPlatformUsers(): Promise<PlatformUser[]> {
+  if (useSupabase) {
+    const [users, owned]: [UserRow[], { owner_id: string | null }[]] = await Promise.all([
+      sb("users?select=id,email,email_verified,created_at&order=created_at.desc"),
+      sb("businesses?select=owner_id"),
+    ]);
+    return users.map((u) => ({ id: u.id, email: u.email, emailVerified: u.email_verified, createdAt: u.created_at, businesses: owned.filter((b) => b.owner_id === u.id).length }));
+  }
+  const db = await load();
+  return Object.values(db.users)
+    .map((u) => ({ id: u.id, email: u.email, emailVerified: u.emailVerified, createdAt: u.createdAt, businesses: Object.values(db.businesses).filter((b) => b.ownerId === u.id).length }))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /* ---- businesses ---- */

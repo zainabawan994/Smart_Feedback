@@ -4,7 +4,7 @@ import SettingsForm from "./SettingsForm";
 
 export default async function SettingsPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ welcome?: string }> }) {
   const { slug } = await params;
-  const { business } = await requireOwnerPage(slug);
+  const { business, readOnly } = await requireOwnerPage(slug);
   const { welcome } = await searchParams;
   return (
     <div className={page}>
@@ -17,7 +17,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
           </p>
         </div>
       )}
-      <SettingsForm initial={business} />
+      <SettingsForm initial={business} readOnly={readOnly} />
     </div>
   );
 }

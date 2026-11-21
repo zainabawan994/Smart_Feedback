@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "crypto";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { hmac } from "./secret.ts";
 import { getBusiness, getLoginAttempts, getUserById, putLoginAttempts, type Business, type User } from "./store";
 
@@ -44,20 +44,37 @@ export async function currentUser(): Promise<User | null> {
   return user?.emailVerified ? user : null;
 }
 
-/** For pages: the signed-in, verified owner of this business, or redirect.
+/** Platform owners: verified accounts whose email is listed in SUPER_ADMIN_EMAILS (comma-separated). */
+export function isSuperAdmin(user: Pick<User, "email" | "emailVerified"> | null) {
+  const list = (process.env.SUPER_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return Boolean(user?.emailVerified && list.includes(user.email.toLowerCase()));
+}
+
+/** For super-admin pages. Everyone else gets a 404, so the page doesn't reveal it exists. */
+export const requireSuperAdmin = cache(async (): Promise<User> => {
+  const user = await sessionUser();
+  if (!user) redirect("/login?next=/superadmin");
+  if (!isSuperAdmin(user)) notFound();
+  return user;
+});
+
+/** For pages: the signed-in, verified owner of this business, or redirect. A super-admin may open any
+ *  business's desk with readOnly: true (pages hide save buttons; the owner APIs refuse them anyway).
  *  cache(): the admin layout and the page both call this; it runs once per request. */
-export const requireOwnerPage = cache(async (slug: string): Promise<{ user: User; business: Business }> => {
+export const requireOwnerPage = cache(async (slug: string): Promise<{ user: User; business: Business; readOnly: boolean }> => {
   const [user, business] = await Promise.all([sessionUser(), getBusiness(slug)]);
   if (!user) redirect(`/login?next=/admin/${encodeURIComponent(slug)}`);
   if (!user.emailVerified) redirect("/verify");
-  if (!business || business.ownerId !== user.id) redirect("/admin");
-  return { user, business };
+  if (!business) redirect("/admin");
+  if (business.ownerId === user.id) return { user, business, readOnly: false };
+  if (isSuperAdmin(user)) return { user, business, readOnly: true };
+  redirect("/admin");
 });
 
-/** For API routes: the business if the signed-in, verified user owns it, else null. */
+/** For API routes: the business if the signed-in, verified user owns it and it isn't suspended, else null. */
 export async function ownedBusiness(slug: string) {
   const [user, business] = await Promise.all([currentUser(), getBusiness(slug)]);
-  return user && business && business.ownerId === user.id ? business : null;
+  return user && business && business.ownerId === user.id && !business.suspended ? business : null;
 }
 
 // 5 wrong passwords lock that email for 15 minutes. Stored in the database so every server sees it.

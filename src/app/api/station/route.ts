@@ -14,7 +14,8 @@ export async function POST(req: Request) {
   const expected = Buffer.from(stationKey(slug));
   if (!slug || given.length !== expected.length || !timingSafeEqual(given, expected)) return Response.json({ error: "Bad key" }, { status: 401 });
   if (!SENTIMENTS.includes(body.sentiment)) return Response.json({ error: "Bad sentiment" }, { status: 400 });
-  if (!(await getBusiness(slug))) return Response.json({ error: "Not found" }, { status: 404 });
+  const b = await getBusiness(slug);
+  if (!b || b.suspended) return Response.json({ error: "Not found" }, { status: 404 });
   if (!(await allow("station-biz", slug, 30, 60))) return tooMany(); // a stuck button must not flood the overview
   await track(slug, "tap", body.sentiment);
   return Response.json({ ok: true });

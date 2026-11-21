@@ -2,11 +2,11 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { clearLoginFailures, currentUser, endSession, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
+import { clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
-import { createBusiness, createUser, getUserByEmail, updateUser } from "./store";
+import { createBusiness, createUser, getBusiness, getUserByEmail, updateBusiness, updateUser } from "./store";
 import { hashPassword, verifyPassword } from "./password.ts";
-import { normalizeReviewUrl } from "./options.ts";
+import { PLANS, normalizeReviewUrl, type Plan } from "./options.ts";
 import { TOO_MANY, allow, clientIp } from "./guard.ts";
 
 export type FormState = { error?: string; info?: string; sentAt?: number } | undefined;
@@ -202,6 +202,33 @@ export async function confirmEmailChange(_: FormState, f: FormData): Promise<For
 export async function cancelEmailChange(f: FormData) {
   (await cookies()).delete(NEW_EMAIL_COOKIE);
   redirect(accountPage(f));
+}
+
+/* ---------------- super-admin ---------------- */
+
+/** Suspend / resume a business and set its plan. Expiry left empty = today + the plan's length. */
+export async function superAdminUpdateBusiness(_: FormState, f: FormData): Promise<FormState> {
+  const user = await currentUser();
+  if (!isSuperAdmin(user)) return { error: "Not allowed." };
+  const slug = str(f, "slug", 40);
+  if (!(await getBusiness(slug))) return { error: "Business not found." };
+  const planKey = str(f, "plan", 20);
+  const plan = PLANS.find((p) => p.key === planKey);
+  if (planKey && !plan) return { error: "Unknown plan." };
+  let planExpiresAt: string | null = null;
+  const expires = str(f, "expires", 10);
+  if (plan) {
+    if (expires) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(expires) || isNaN(Date.parse(expires))) return { error: "Pick a valid expiry date." };
+      planExpiresAt = new Date(`${expires}T23:59:59+05:00`).toISOString(); // end of that day, Pakistan time
+    } else {
+      const d = new Date();
+      d.setMonth(d.getMonth() + plan.months);
+      planExpiresAt = d.toISOString();
+    }
+  }
+  await updateBusiness(slug, { suspended: f.get("suspended") === "on", plan: (plan?.key ?? null) as Plan | null, planExpiresAt });
+  return { info: "Saved." };
 }
 
 export async function addBusiness(_: FormState, f: FormData): Promise<FormState> {

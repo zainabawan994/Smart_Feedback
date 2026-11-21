@@ -30,3 +30,22 @@ export function googleLink(b: { googleReviewUrl: string; name: string; city: str
   if (b.googleReviewUrl && !b.googleReviewUrl.includes("REPLACE_WITH")) return b.googleReviewUrl;
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${b.name} ${b.city}`)}`;
 }
+
+/** Subscription plans the super-admin can set (payments are not wired up yet). */
+export const PLANS = [
+  { key: "monthly", label: "Monthly", months: 1 },
+  { key: "6months", label: "6 Months", months: 6 },
+  { key: "yearly", label: "Yearly", months: 12 },
+] as const;
+export type Plan = (typeof PLANS)[number]["key"];
+
+/** Plan status the way the super-admin needs to read it at a glance. */
+export function planState(b: { plan?: Plan | null; planExpiresAt?: string | null; suspended?: boolean }, now = Date.now()) {
+  if (b.suspended) return { label: "Suspended", tone: "bad" as const };
+  if (!b.plan) return { label: "No plan", tone: "muted" as const };
+  const name = PLANS.find((p) => p.key === b.plan)?.label ?? b.plan;
+  const left = b.planExpiresAt ? Math.ceil((+new Date(b.planExpiresAt) - now) / 86_400_000) : null;
+  if (left !== null && left < 0) return { label: `${name} · expired`, tone: "bad" as const };
+  if (left !== null && left <= 7) return { label: `${name} · ${left}d left`, tone: "warn" as const };
+  return { label: name, tone: "ok" as const };
+}
