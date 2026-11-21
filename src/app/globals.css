@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* SmartFeedback: café order-ticket palette. Paper, ink, tomato. No gradients. */
+:root {
+  --paper: #f3ede2;
+  --card: #fbf8f2;
+  --ink: #1c1a16;
+  --muted: #6f675b;
+  --line: #d8cfbf;
+  --tomato: #d4442a;
+  --tomato-ink: #fff6ef;
+  --leaf: #2f5d4e;
+  --mustard: #d99a1e;
+  --plum: #7a2e3a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #16140f;
+    --card: #1f1c16;
+    --ink: #f1e9da;
+    --muted: #a59b8a;
+    --line: #3a342a;
+    --tomato: #ef5a3c;
+    --tomato-ink: #1a0d08;
+    --leaf: #6fae97;
+    --mustard: #e9b54a;
+    --plum: #d27b89;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-tomato: var(--tomato);
+  --color-tomato-ink: var(--tomato-ink);
+  --color-leaf: var(--leaf);
+  --color-mustard: var(--mustard);
+  --color-plum: var(--plum);
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-grotesk);
+  --font-mono: var(--font-plex-mono);
+  --font-urdu: var(--font-nastaliq);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-grotesk), system-ui, sans-serif;
+  /* faint paper grain */
+  background-image: radial-gradient(color-mix(in oklab, var(--ink) 7%, transparent) 0.6px, transparent 0.6px);
+  background-size: 5px 5px;
+}
+
+::selection { background: var(--tomato); color: var(--tomato-ink); }
+
+/* Torn receipt edge for ticket cards */
+.ticket {
+  background: var(--card);
+  --tooth: 9px;
+  mask:
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x,
+    linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth) + 0.5px) no-repeat;
+  padding-bottom: calc(var(--tooth) + 1.25rem);
+}
+
+.dashed { background-image: linear-gradient(to right, var(--line) 50%, transparent 0); background-size: 10px 1px; background-repeat: repeat-x; height: 1px; }
+
+.urdu { font-family: var(--font-nastaliq), serif; line-height: 2.3; }
+
+:focus-visible { outline: 2px solid var(--tomato); outline-offset: 3px; border-radius: 6px; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes print { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+.print { animation: print 0.9s steps(14) both; }
+@media (prefers-reduced-motion: reduce) { .rise, .print { animation: none; } }
