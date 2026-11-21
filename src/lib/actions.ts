@@ -8,7 +8,7 @@ import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
 import { createBusiness, createPayment, createUser, getBusiness, getPayment, getUserByEmail, setPaymentStatus, updateBusiness, updateUser } from "./store";
 import { paymentAccounts } from "./billing.ts";
 import { hashPassword, verifyPassword } from "./password.ts";
-import { PLANS, asPlan, normalizeReviewUrl, planEnd, planInfo, planLabel, rupees, type Plan } from "./options.ts";
+import { IMAGE_DATA_URL, PLANS, RECEIPT_MAX_CHARS, asPlan, normalizeReviewUrl, planEnd, planInfo, planLabel, rupees, type Plan } from "./options.ts";
 import { TOO_MANY, allow, clientIp } from "./guard.ts";
 
 export type FormState = { error?: string; info?: string; sentAt?: number } | undefined;
@@ -224,7 +224,10 @@ export async function submitPayment(_: FormState, f: FormData): Promise<FormStat
   if (!/^[A-Za-z0-9-]{6,60}$/.test(reference)) return { error: "Enter the transaction ID from your receipt (letters and numbers, at least 6)." };
   const payer = str(f, "payer", 80);
   if (!payer) return { error: "Enter the name or number you paid from, so we can find it." };
-  const payment = await createPayment({ slug: business.slug, plan, amountPkr: planInfo(plan).pkr, method, reference, payer });
+  const receipt = String(f.get("receipt") ?? "");
+  if (!receipt) return { error: "Add a screenshot of your payment receipt." };
+  if (receipt.length > RECEIPT_MAX_CHARS || !IMAGE_DATA_URL.test(receipt)) return { error: "The screenshot must be a JPG, PNG or WebP image." };
+  const payment = await createPayment({ slug: business.slug, plan, amountPkr: planInfo(plan).pkr, method, reference, payer, receipt });
   if (!payment) return { error: "That transaction ID was already submitted." };
   await updateBusiness(business.slug, { requestedPlan: plan });
   revalidatePath(`/admin/${business.slug}/billing`);

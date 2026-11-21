@@ -52,6 +52,13 @@ export default async function SuperAdmin() {
                   <p className="mt-0.5 text-muted">
                     {PAYMENT_METHODS.find((m) => m.key === p.method)?.label} · TID <span className="font-mono text-ink">{p.reference}</span> · from {p.payer} · {when(p.createdAt)}
                   </p>
+                  {p.hasReceipt ? (
+                    <Link href={`/superadmin/receipt/${p.id}`} className="mt-1 inline-block text-sm text-tomato underline underline-offset-4">
+                      View payment screenshot →
+                    </Link>
+                  ) : (
+                    <p className="mt-1 text-xs text-muted">No screenshot attached</p>
+                  )}
                 </div>
                 <form action={decidePaymentAction} className="flex flex-wrap items-center gap-2">
                   <input type="hidden" name="id" value={p.id} />

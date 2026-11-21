@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Business, Lang, Sentiment } from "@/lib/store";
 import { LANGS, NOTE_MAX, OCCASIONS, googleLink } from "@/lib/options";
+import { shrinkImage } from "@/lib/image";
 
 const FEELINGS: { key: Sentiment; label: string; ur: string; color: string; mouth: string }[] = [
   { key: "positive", label: "Loved it", ur: "بہت اچھا", color: "var(--leaf)", mouth: "M14 27 Q22 35 30 27" },
@@ -26,13 +27,7 @@ const post = (url: string, body: object) =>
 
 /** Phone photos are 3-10 MB; shrink to ≤640px JPEG (~60 KB). Enough to recognise food, and far fewer model tokens (Groq free tier: 7k tokens/min). */
 async function shrinkPhoto(file: File) {
-  const img = await createImageBitmap(file);
-  const scale = Math.min(1, 640 / Math.max(img.width, img.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(img.width * scale);
-  canvas.height = Math.round(img.height * scale);
-  canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", 0.8);
+  return shrinkImage(file, 640);
 }
 
 export default function Flow({ business: b, ticketNo }: { business: Business; ticketNo: string }) {

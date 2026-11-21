@@ -39,6 +39,7 @@ export type Payment = {
   note: string | null; // reason when rejected or refunded
   createdAt: string;
   decidedAt: string | null;
+  hasReceipt: boolean; // the screenshot itself is only loaded on its own page (getReceipt)
 };
 
 /** One row of the super-admin's business list. */
@@ -336,15 +337,20 @@ export async function rateLimit(key: string, max: number, windowSec: number): Pr
 
 /* ---- payments (manual transfers) ---- */
 
-type PaymentRow = { id: string; slug: string; plan: Plan; amount_pkr: number; method: PaymentMethod; reference: string; payer: string; status: Payment["status"]; note: string | null; created_at: string; decided_at: string | null };
-const paymentFromRow = (r: PaymentRow): Payment => ({ id: r.id, slug: r.slug, plan: r.plan, amountPkr: r.amount_pkr, method: r.method, reference: r.reference, payer: r.payer, status: r.status, note: r.note, createdAt: r.created_at, decidedAt: r.decided_at });
+type PaymentRow = { id: string; slug: string; plan: Plan; amount_pkr: number; method: PaymentMethod; reference: string; payer: string; status: Payment["status"]; note: string | null; created_at: string; decided_at: string | null; has_receipt: boolean };
+const paymentFromRow = (r: PaymentRow): Payment => ({ id: r.id, slug: r.slug, plan: r.plan, amountPkr: r.amount_pkr, method: r.method, reference: r.reference, payer: r.payer, status: r.status, note: r.note, createdAt: r.created_at, decidedAt: r.decided_at, hasReceipt: Boolean(r.has_receipt) });
+// Every column except the screenshot (lists stay small); has_receipt is a generated column.
+const PAYMENT_COLS = "id,slug,plan,amount_pkr,method,reference,payer,status,note,created_at,decided_at,has_receipt";
+// shortcut: JSON mode keeps screenshots inside data/db.json; fine for local testing only.
+const localReceipts = (db: DB) => ((db as DB & { receipts?: Record<string, string> }).receipts ??= {});
 
 /** Records a reported payment. Returns null if that transaction ID was already submitted for this method. */
-export async function createPayment(p: Pick<Payment, "slug" | "plan" | "amountPkr" | "method" | "reference" | "payer">): Promise<Payment | null> {
-  const payment: Payment = { ...p, id: randomUUID(), status: "pending", note: null, createdAt: new Date().toISOString(), decidedAt: null };
+export async function createPayment(p: Pick<Payment, "slug" | "plan" | "amountPkr" | "method" | "reference" | "payer"> & { receipt: string }): Promise<Payment | null> {
+  const { receipt, ...fields } = p;
+  const payment: Payment = { ...fields, id: randomUUID(), status: "pending", note: null, createdAt: new Date().toISOString(), decidedAt: null, hasReceipt: true };
   if (useSupabase) {
     try {
-      await sb("payments", { method: "POST", body: JSON.stringify({ id: payment.id, slug: p.slug, plan: p.plan, amount_pkr: p.amountPkr, method: p.method, reference: p.reference, payer: p.payer }), headers: { Prefer: "return=minimal" } });
+      await sb("payments", { method: "POST", body: JSON.stringify({ id: payment.id, slug: p.slug, plan: p.plan, amount_pkr: p.amountPkr, method: p.method, reference: p.reference, payer: p.payer, receipt }), headers: { Prefer: "return=minimal" } });
     } catch (e) {
       if (String(e).includes("23505")) return null; // unique (method, reference): same receipt twice
       throw e;
@@ -354,15 +360,25 @@ export async function createPayment(p: Pick<Payment, "slug" | "plan" | "amountPk
   const db = await load();
   if (db.payments.some((x) => x.method === p.method && x.reference.toLowerCase() === p.reference.toLowerCase())) return null;
   db.payments.unshift(payment);
+  localReceipts(db)[payment.id] = receipt;
   await save(db);
   return payment;
+}
+
+/** The receipt screenshot (data URL) for one payment, or null. */
+export async function getReceipt(id: string): Promise<string | null> {
+  if (useSupabase) {
+    const rows: { receipt: string | null }[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&select=receipt`);
+    return rows[0]?.receipt ?? null;
+  }
+  return localReceipts(await load())[id] ?? null;
 }
 
 /** Newest first. Filter by business and/or status. */
 export async function listPayments(filter: { slug?: string; status?: Payment["status"] } = {}, limit = 100): Promise<Payment[]> {
   if (useSupabase) {
     const q = [filter.slug && `slug=eq.${encodeURIComponent(filter.slug)}`, filter.status && `status=eq.${filter.status}`].filter(Boolean).join("&");
-    const rows: PaymentRow[] = await sb(`payments?select=*${q ? `&${q}` : ""}&order=created_at.desc&limit=${limit}`);
+    const rows: PaymentRow[] = await sb(`payments?select=${PAYMENT_COLS}${q ? `&${q}` : ""}&order=created_at.desc&limit=${limit}`);
     return rows.map(paymentFromRow);
   }
   return (await load()).payments.filter((p) => (!filter.slug || p.slug === filter.slug) && (!filter.status || p.status === filter.status)).slice(0, limit);
@@ -370,7 +386,7 @@ export async function listPayments(filter: { slug?: string; status?: Payment["st
 
 export async function getPayment(id: string): Promise<Payment | null> {
   if (useSupabase) {
-    const rows: PaymentRow[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&select=*`);
+    const rows: PaymentRow[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&select=${PAYMENT_COLS}`);
     return rows[0] ? paymentFromRow(rows[0]) : null;
   }
   return (await load()).payments.find((p) => p.id === id) ?? null;
@@ -381,7 +397,7 @@ export async function getPayment(id: string): Promise<Payment | null> {
 export async function setPaymentStatus(id: string, from: Payment["status"], to: Payment["status"], note: string | null): Promise<Payment | null> {
   const decidedAt = new Date().toISOString();
   if (useSupabase) {
-    const rows: PaymentRow[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&status=eq.${from}`, { method: "PATCH", body: JSON.stringify({ status: to, note, decided_at: decidedAt }) });
+    const rows: PaymentRow[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&status=eq.${from}&select=${PAYMENT_COLS}`, { method: "PATCH", body: JSON.stringify({ status: to, note, decided_at: decidedAt }) });
     return rows[0] ? paymentFromRow(rows[0]) : null;
   }
   const db = await load();

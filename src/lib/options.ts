@@ -15,6 +15,8 @@ export const LANGS = [
 export const OCCASIONS = ["Breakfast", "Lunch", "Dinner", "Evening chai", "With family", "With friends", "Date", "Work meeting", "Takeaway"] as const;
 
 export const NOTE_MAX = 300;
+export const RECEIPT_MAX_CHARS = 900_000; // receipt screenshot as a data URL (~650 KB image); the page shrinks it first
+export const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 export const PHOTO_MAX_CHARS = 1_500_000; // ~1.1 MB image as a data URL; the page downsizes before sending
 
 /** Owner input -> review link. Accepts a full https link or a bare Google Place ID (starts with "ChIJ"). null = invalid. */
@@ -34,7 +36,8 @@ export function googleLink(b: { googleReviewUrl: string; name: string; city: str
 /** Subscription plans the super-admin can set (payments are not wired up yet). */
 // pkr: what owners transfer (bank / Easypaisa / JazzCash). Matches the USD prices on the home page at about Rs 280 per dollar.
 export const PLANS = [
-  { key: "monthly", label: "Monthly", months: 1, usd: 12, pkr: 3400 },
+  // shortcut: Rs 20 so the owner can test a real transfer cheaply; set back to 3400 before launch.
+  { key: "monthly", label: "Monthly", months: 1, usd: 12, pkr: 20 },
   { key: "6months", label: "6 Months", months: 6, usd: 60, pkr: 17000 },
   { key: "yearly", label: "Yearly", months: 12, usd: 96, pkr: 27000 },
 ] as const;

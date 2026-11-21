@@ -4,7 +4,7 @@ import { cancelPayment, cancelPlan, submitPayment } from "@/lib/actions";
 import { listPayments, type Payment } from "@/lib/store";
 import { PAYMENT_METHODS, PLANS, asPlan, daysUntil, isFuture, planLabel, planState, rupees } from "@/lib/options";
 import { paymentAccounts } from "@/lib/billing";
-import { ActionForm, Field, inputCls } from "@/components/forms";
+import { ActionForm, Field, ReceiptInput, inputCls } from "@/components/forms";
 import { StateBadge } from "@/app/superadmin/ui";
 import { PageHeader, card, day, eyebrow, page, when } from "../ui";
 
@@ -161,6 +161,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
                     </label>
                     <Field label="Transaction ID" hint="from your receipt" name="reference" required minLength={6} maxLength={60} autoComplete="off" />
                     <Field label="Paid from" hint="your name or mobile number" name="payer" required maxLength={80} />
+                    <ReceiptInput />
                   </ActionForm>
                 </div>
               </div>
@@ -194,6 +195,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
                     <td className="px-3 py-3 text-right font-mono">{rupees(p.amountPkr)}</td>
                     <td className="px-3 py-3">
                       {methodLabel(p.method)} · <span className="font-mono text-xs">{p.reference}</span>
+                      {p.hasReceipt && <span className="block text-xs text-muted">screenshot attached</span>}
                     </td>
                     <td className="px-5 py-3">
                       <span className={STATUS[p.status].cls}>{STATUS[p.status].label}</span>

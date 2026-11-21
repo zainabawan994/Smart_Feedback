@@ -131,6 +131,14 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
                   <span className="block text-xs text-muted">
                     <span className={p.status === "approved" ? "text-leaf" : p.status === "pending" ? "text-tomato" : "text-plum"}>{p.status}</span> · {when(p.createdAt)}
                     {p.note && <> · {p.note}</>}
+                    {p.hasReceipt && (
+                      <>
+                        {" · "}
+                        <Link href={`/superadmin/receipt/${p.id}`} className="text-tomato underline underline-offset-2">
+                          screenshot
+                        </Link>
+                      </>
+                    )}
                   </span>
                 </span>
                 {(p.status === "pending" || p.status === "approved") && (

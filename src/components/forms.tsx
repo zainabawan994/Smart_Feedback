@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { startTransition, useActionState, useEffect, useState } from "react";
 import type { FormState } from "@/lib/actions";
+import { shrinkImage } from "@/lib/image";
 
 export const inputCls = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-[15px] outline-none transition focus:border-ink";
 
@@ -143,5 +144,39 @@ export function PlanNote({ label }: { label: string }) {
     <p className="-mt-2 mb-5 rounded-lg border border-mustard px-3 py-2 text-sm">
       <span className="font-medium">{label} plan selected.</span> Continue and we&apos;ll switch it on for your business once payment is confirmed.
     </p>
+  );
+}
+
+/** Receipt screenshot for a payment: shrunk in the browser and sent as a data URL in a hidden "receipt" field
+ *  (the file itself is not submitted, so big phone screenshots stay under the upload limit). */
+export function ReceiptInput() {
+  const [receipt, setReceipt] = useState("");
+  const [error, setError] = useState("");
+  return (
+    <div>
+      <span className="text-sm font-medium">Payment screenshot</span>
+      <span className="ml-2 text-xs text-muted">photo of the receipt showing amount and TID</span>
+      <input
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        required
+        className={`${inputCls} mt-1.5 file:mr-3 file:rounded-full file:border-0 file:bg-ink file:px-3 file:py-1 file:text-paper`}
+        onChange={async (e) => {
+          setError("");
+          setReceipt("");
+          const file = e.target.files?.[0];
+          if (!file) return;
+          try {
+            setReceipt(await shrinkImage(file, 1400)); // big enough to read the amount and TID
+          } catch {
+            setError("Couldn't read that image. Try a JPG or PNG screenshot.");
+          }
+        }}
+      />
+      <input type="hidden" name="receipt" value={receipt} />
+      {error && <p className="mt-1 text-sm text-plum">{error}</p>}
+      {/* eslint-disable-next-line @next/next/no-img-element -- local preview of a data URL */}
+      {receipt && <img src={receipt} alt="Receipt preview" className="mt-2 max-h-40 rounded-lg border border-line" />}
+    </div>
   );
 }
