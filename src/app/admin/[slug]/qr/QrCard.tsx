@@ -21,7 +21,7 @@ export default function QrCard({ name, slug, url }: { name: string; slug: string
   }
 
   return (
-    <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,26rem)_1fr]">
+    <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,26rem)_1fr]">
       {/* Printable card: only this element shows when printing (see print styles below). */}
       <div id="table-card" className="ticket mx-auto w-full max-w-[22rem] rounded-t-2xl border-x border-t border-line p-7 text-center">
         <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted">{name}</p>
@@ -36,7 +36,7 @@ export default function QrCard({ name, slug, url }: { name: string; slug: string
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Your words · your review</p>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid min-w-0 grid-cols-1 gap-4">
         <div className="rounded-2xl border border-line bg-card p-5">
           <h2 className="font-display text-2xl">Print or share</h2>
           <p className="mt-1 text-sm text-muted">The PNG is high resolution (512px), sharp enough for table tents, menus and posters.</p>

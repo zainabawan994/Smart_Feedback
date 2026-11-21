@@ -1,6 +1,7 @@
 import { getBusiness, saveDraft, track, type Lang, type Sentiment } from "@/lib/store";
 import { draftReview } from "@/lib/review";
-import { LANGS, NOTE_MAX, OCCASIONS, PHOTO_MAX_CHARS } from "@/lib/options";
+import { LANGS, NOTE_MAX, PHOTO_MAX_CHARS } from "@/lib/options";
+import { typeOf } from "@/lib/business-types";
 import { allow, clientIp, tooMany } from "@/lib/guard";
 
 const SENTIMENTS: Sentiment[] = ["positive", "neutral", "negative"];
@@ -28,11 +29,12 @@ export async function POST(req: Request) {
   // Only accept options the business/app actually offers, so nothing arbitrary reaches the prompt.
   const picks = arr(body.picks).filter((p) => b.highlights[sentiment].includes(p)).slice(0, 3);
   const items = arr(body.items).filter((p) => b.menu.includes(p)).slice(0, 3);
-  const occasions = arr(body.occasions).filter((o) => (OCCASIONS as readonly string[]).includes(o)).slice(0, 2);
+  const type = typeOf(b.kind);
+  const occasions = arr(body.occasions).filter((o) => type.occasions.includes(o)).slice(0, 2);
   const note = typeof body.note === "string" ? body.note.replace(/\s+/g, " ").trim().slice(0, NOTE_MAX) : "";
 
   let photo: string | undefined;
-  if (body.photo) {
+  if (body.photo && type.photo) { // types without photos (clinics, schools) ignore any that are sent
     if (typeof body.photo !== "string" || body.photo.length > PHOTO_MAX_CHARS || !PHOTO_RE.test(body.photo))
       return Response.json({ error: "Photo must be a JPG, PNG or WebP under about 1 MB" }, { status: 400 });
     photo = body.photo;

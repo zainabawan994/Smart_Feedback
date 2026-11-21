@@ -1,4 +1,5 @@
 import type { Business, Lang, Sentiment } from "./store";
+import { typeOf } from "./business-types.ts";
 
 export type DraftInput = {
   picks: string[];
@@ -32,16 +33,16 @@ const rules = (lang: Lang) =>
   `Use ONLY the points given. Never add opinions, details, dishes, staff names, prices or events that were not given. ` +
   (lang === "ur"
     ? `Write place, city and dish names in Urdu script by how they sound (e.g. Burger → برگر, Club Sandwich → کلب سینڈوچ); no English letters anywhere. `
-    : `Keep place and dish names exactly as written, untranslated. `) +
-  `Mention what I had only as what I ordered; do not describe or rate it unless a point or my own words say something about it. ` +
+    : `Keep place and item names exactly as written, untranslated. `) +
+  `Mention the items I chose only by name; do not describe or rate them unless a point or my own words say something about them. ` +
   `Show the mood through the details; never summarise it in a sentence (no "Happy with the visit", "Okay experience", "negative experience"). End on a concrete detail.`;
 
 // Search-friendly = specific and natural. Google's local results and AI assistants (ChatGPT, Gemini,
 // AI Overviews) favour reviews that clearly name the place, the area, what was ordered and the
 // occasion. Repetition or keyword lists read as spam and break Google's review policy, so: once each.
 const SEARCH =
-  `Make it useful to someone searching: mention the place name once and the city once, name each dish I had exactly once, ` +
-  `and say the occasion if given (e.g. "for breakfast with family"). Never repeat the place name, never list keywords, never add places or dishes I did not give.`;
+  `Make it useful to someone searching: mention the place name once and the city once, name each item I chose exactly once, ` +
+  `and say the occasion if given (e.g. "for breakfast with family"). Never repeat the place name, never list keywords, never add places or items I did not give.`;
 
 function generationPrompt(b: Business, d: DraftInput, photoOther: string[] = []) {
   return [
@@ -60,12 +61,12 @@ function generationPrompt(b: Business, d: DraftInput, photoOther: string[] = [])
       content:
         `Place: ${b.name}, ${b.city}\nMy mood: ${MOOD[d.sentiment]}\n` +
         (d.picks.length ? `What I noticed: ${d.picks.join("; ")}\n` : "") +
-        (d.items.length ? `What I had: ${d.items.join(", ")}\n` : "") +
+        (d.items.length ? `${typeOf(b.kind).items.aiLabel}: ${d.items.join(", ")}\n` : "") +
         (d.occasions?.length ? `Occasion: ${d.occasions.join(", ")}\n` : "") +
         (photoOther.length ? `Also on my table (just name them, do not describe): ${photoOther.join(", ")}\n` : "") +
         (d.note ? `My own words: """${d.note}"""\n` : "") +
         // Inputs are in Latin letters, so models drift into Roman Urdu unless the ask itself is in Urdu script.
-        (d.lang === "ur" ? `میرا ریویو صرف اردو رسم الخط میں لکھیں (Roman Urdu یا انگریزی نہیں)۔ "${b.name}"، شہر اور ڈش کے نام بھی اردو حروف میں لکھیں۔` : `Write my review.`),
+        (d.lang === "ur" ? `میرا ریویو صرف اردو رسم الخط میں لکھیں (Roman Urdu یا انگریزی نہیں)۔ "${b.name}"، شہر اور چیزوں کے نام بھی اردو حروف میں لکھیں۔` : `Write my review.`),
     },
   ];
 }
@@ -74,7 +75,8 @@ function generationPrompt(b: Business, d: DraftInput, photoOther: string[] = [])
    A free-text description ("golden, crispy paratha on a rustic board") made the draft invent opinions
    and scenes. So the photo only tells us WHAT was there: menu names where they match, plain nouns otherwise. */
 
-function photoPrompt(photo: string, menu: string[]) {
+function photoPrompt(photo: string, menu: string[], kind: string) {
+  const things = typeOf(kind).photo?.things ?? "items";
   return [
     {
       role: "user",
@@ -82,14 +84,14 @@ function photoPrompt(photo: string, menu: string[]) {
         {
           type: "text",
           text:
-            `A customer took this photo at a café/restaurant. List only the food and drinks you can clearly see.\n` +
-            `Menu: ${JSON.stringify(menu)}\n` +
+            `A customer took this photo at a ${kind}. List only the ${things} you can clearly see.\n` +
+            `Menu / items list: ${JSON.stringify(menu)}\n` +
             `Reply with JSON only: {"menu": [...], "other": [...]}\n` +
             `"menu": exact menu names that are clearly visible. "other": up to 3 other visible foods or drinks as plain 1-3 word nouns ` +
             `(e.g. "cup of tea", "fries"), no adjectives, no taste, no setting. Only include what you are sure of. ` +
             `Each physical item goes in ONE list only: if a cup is already "Doodh patti" in "menu", do not also add "cup of tea" to "other". ` +
             `Use a menu name only if it clearly matches; when unsure which menu item it is, put a plain noun in "other" instead. ` +
-            `If there is no food or drink in the photo, reply {"menu": [], "other": []}.`,
+            `If none of that is in the photo, reply {"menu": [], "other": []}.`,
         },
         { type: "image_url", image_url: { url: photo } },
       ],
@@ -190,7 +192,7 @@ export function templateDraft(b: Business, d: DraftInput) {
   const fill = (s: string) => s.replace("{name}", b.name).replace("{city}", b.city);
   const sep = d.lang === "ur" ? "۔ " : ". ";
   const list = d.items.join(d.lang === "ur" ? "، " : " and ");
-  const had = !d.items.length ? "" : { en: `I had the ${list}`, ur: `میں نے ${list} لیا`, roman: `Maine ${d.items.join(" aur ")} liya` }[d.lang] + sep;
+  const had = !d.items.length ? "" : typeOf(b.kind).had[d.lang](d.lang === "roman" ? d.items.join(" aur ") : list) + sep;
   const when = d.occasions?.length ? { en: `Came ${d.occasions.map((o) => (/^with /i.test(o) ? "" : "for ") + o.toLowerCase()).join(", ")}`, ur: `${d.occasions.join("، ")} کے لیے آیا تھا`, roman: `${d.occasions.join(", ")} ke liye aaya tha` }[d.lang] + sep : "";
   const points = d.picks.length ? d.picks.join(sep) + sep : "";
   const note = d.note ? d.note.replace(/[.!?۔\s]*$/, "").replace(/^[a-z]/, (c) => c.toUpperCase()) + sep : "";
@@ -244,7 +246,7 @@ export async function draftReview(b: Business, d: DraftInput): Promise<DraftResu
   const visionModel = process.env.VISION_MODEL || genModel;
   if (d.photo && base && visionModel) {
     try {
-      const seen = parsePhoto(await chat(base, key, visionModel, photoPrompt(d.photo, b.menu), 150), b.menu);
+      const seen = parsePhoto(await chat(base, key, visionModel, photoPrompt(d.photo, b.menu, b.kind), 150), b.menu);
       // Menu dishes seen in the photo count as "what I had" (exact names also help search).
       d = { ...d, items: [...new Set([...d.items, ...seen.items])].slice(0, 3) };
       photoOther = seen.other;

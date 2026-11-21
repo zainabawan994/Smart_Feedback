@@ -10,9 +10,7 @@ export const LANGS = [
   { key: "ur", label: "اردو" },
 ] as const;
 
-// "When / who with" context. Search engines and AI assistants match reviews to queries like
-// "breakfast spot in Lahore" or "family dinner place", so customer-chosen context helps discovery.
-export const OCCASIONS = ["Breakfast", "Lunch", "Dinner", "Evening chai", "With family", "With friends", "Date", "Work meeting", "Takeaway"] as const;
+// "When / who with" chips live per business type in business-types.ts.
 
 export const NOTE_MAX = 300;
 export const RECEIPT_MAX_CHARS = 900_000; // receipt screenshot as a data URL (~650 KB image); the page shrinks it first

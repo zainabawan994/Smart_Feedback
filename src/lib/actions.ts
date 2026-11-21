@@ -8,6 +8,7 @@ import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
 import { createBusiness, createPayment, createUser, getBusiness, getPayment, getUserByEmail, setPaymentStatus, updateBusiness, updateUser } from "./store";
 import { paymentAccounts } from "./billing.ts";
 import { hashPassword, verifyPassword } from "./password.ts";
+import { typeOf } from "./business-types.ts";
 import { IMAGE_DATA_URL, PLANS, RECEIPT_MAX_CHARS, asPlan, normalizeReviewUrl, planEnd, planInfo, planLabel, rupees, type Plan } from "./options.ts";
 import { TOO_MANY, allow, clientIp } from "./guard.ts";
 
@@ -30,7 +31,7 @@ function newPassword(f: FormData): { password: string } | { error: string } {
 function placeFields(f: FormData) {
   const googleReviewUrl = normalizeReviewUrl(str(f, "googleReviewUrl", 500));
   if (googleReviewUrl === null) return { error: "Paste a Google review link starting with https://, or your Place ID (starts with ChIJ)." };
-  const place = { name: str(f, "name", 80), city: str(f, "city", 60), kind: str(f, "kind", 30) || "café", googleReviewUrl };
+  const place = { name: str(f, "name", 80), city: str(f, "city", 60), kind: typeOf(str(f, "kind", 40) || "café").noun, googleReviewUrl };
   if (!place.name || !place.city) return { error: "Add your business name and city." };
   return { place };
 }

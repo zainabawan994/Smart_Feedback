@@ -1,6 +1,7 @@
 import { getStats, updateBusiness, type Business } from "@/lib/store";
 import { ownedBusiness } from "@/lib/auth";
 import { normalizeReviewUrl } from "@/lib/options";
+import { typeOf } from "@/lib/business-types";
 
 // Owners only. 404 (not 403) for other people's businesses so slugs can't be probed.
 const notFound = () => Response.json({ error: "Not found" }, { status: 404 });
@@ -23,7 +24,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ slug: st
   const patch: Partial<Business> = {
     name: String(b.name ?? "").slice(0, 80) || undefined,
     city: String(b.city ?? "").slice(0, 60) || undefined,
-    kind: String(b.kind ?? "").slice(0, 30) || undefined,
+    kind: b.kind ? typeOf(String(b.kind).slice(0, 40)).noun : undefined,
     googleReviewUrl: url || undefined,
     menu: list(b.menu),
     defaultLang: ["en", "ur", "roman"].includes(b.defaultLang) ? b.defaultLang : "en",

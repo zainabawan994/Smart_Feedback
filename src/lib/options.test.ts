@@ -47,3 +47,14 @@ console.log("options.test plan state: ok");
   assert.equal(planState({ plan: "6months", planExpiresAt: "2026-11-21T11:59:59Z", planCancelledAt: "2026-11-21T10:00:00Z" }, now).label, "6 Months · expired");
   console.log("options.test just ended: ok");
 }
+
+{
+  const { typeOf } = await import("./business-types.ts");
+  assert.equal(typeOf("café").key, "restaurant");
+  assert.equal(typeOf("Restaurant").key, "restaurant"); // older free-text kinds
+  assert.equal(typeOf("clothing store").key, "clothing");
+  assert.equal(typeOf("school").items.question, "Which class or program?");
+  assert.equal(typeOf("clinic").photo, null); // no medical photos
+  assert.equal(typeOf("spaceship repair").key, "service");
+  console.log("options.test business types: ok");
+}

@@ -56,3 +56,11 @@ console.log("review.test photo dedupe: ok");
   assert.equal(acceptNormalized(draft, "Had dinner at Chai Khana, Lahore. My roll came cold after a really long wait.", "negative", "en", ["Chai Khana", "Lahore", "Zinger roll"]), false);
   console.log("review.test accuracy guards: ok");
 }
+
+// Template wording follows the business type.
+{
+  const shop = { ...b, kind: "clothing store", name: "Khaadi", city: "Lahore" };
+  const t = templateDraft(shop, { picks: ["Nice designs"], items: ["Lawn suit"], sentiment: "positive", lang: "en" });
+  assert.ok(t.includes("I bought the Lawn suit"), t);
+  console.log("review.test business type: ok");
+}

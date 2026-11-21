@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Business } from "@/lib/store";
 import { inputCls } from "@/components/forms";
 import { SENT } from "../ui";
+import { BUSINESS_TYPES, typeOf } from "@/lib/business-types";
 
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
@@ -29,6 +30,7 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
   });
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const type = typeOf(b.kind);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -66,7 +68,13 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
           </Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Type">
-              <input className={inputCls} value={b.kind} maxLength={30} onChange={(e) => setB({ ...b, kind: e.target.value })} />
+              <select className={inputCls} value={typeOf(b.kind).noun} onChange={(e) => setB({ ...b, kind: e.target.value })}>
+                {BUSINESS_TYPES.map((t) => (
+                  <option key={t.key} value={t.noun}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Default language">
               <select className={inputCls} value={b.defaultLang} onChange={(e) => setB({ ...b, defaultLang: e.target.value as Business["defaultLang"] })}>
@@ -80,18 +88,30 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
       </section>
 
       <section className={section}>
-        <h2 className="font-display text-2xl">Menu</h2>
-        <p className="mt-1 text-sm text-muted">Customers can tap what they had. Exact dish names in reviews help people find you on Google and AI search.</p>
+        <h2 className="font-display text-2xl">{type.items.title}</h2>
+        <p className="mt-1 text-sm text-muted">Customers see &quot;{type.items.question}&quot; and can tap these. Exact names in reviews help people find you on Google and AI search.</p>
         <div className="mt-4 max-w-md">
-          <Field label="Menu items" hint="one per line, up to 20">
-            <textarea className={`${inputCls} font-mono text-sm`} rows={8} value={menu} onChange={(e) => setMenu(e.target.value)} placeholder={"Doodh patti\nBun kebab"} />
+          <Field label={type.items.title} hint="one per line, up to 20">
+            <textarea className={`${inputCls} font-mono text-sm`} rows={8} value={menu} onChange={(e) => setMenu(e.target.value)} placeholder={type.items.placeholder} />
           </Field>
         </div>
       </section>
 
       <section className={section}>
-        <h2 className="font-display text-2xl">Options customers can pick</h2>
-        <p className="mt-1 text-sm text-muted">One set per feeling. Keep them honest and specific, like &quot;Food came out hot&quot; or &quot;Long wait&quot;.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-2xl">Options customers can pick</h2>
+            <p className="mt-1 text-sm text-muted">One set per feeling. Keep them honest and specific, like &quot;{type.highlights.positive[0]}&quot; or &quot;{type.highlights.negative[0]}&quot;.</p>
+          </div>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => setHl({ positive: type.highlights.positive.join("\n"), neutral: type.highlights.neutral.join("\n"), negative: type.highlights.negative.join("\n") })}
+            className="rounded-full border border-ink px-4 py-2 text-sm transition hover:bg-ink hover:text-paper disabled:opacity-50"
+          >
+            Use suggested options for {type.label}
+          </button>
+        </div>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           {SENT.map((s) => (
             <Field key={s.key} label={s.label} hint="one per line">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { startTransition, useActionState, useEffect, useState } from "react";
 import type { FormState } from "@/lib/actions";
 import { shrinkImage } from "@/lib/image";
+import { BUSINESS_TYPES } from "@/lib/business-types";
 
 export const inputCls = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-[15px] outline-none transition focus:border-ink";
 
@@ -30,10 +31,18 @@ export function PlaceFields() {
   return (
     <>
       <Field label="Business name" name="name" required maxLength={80} placeholder="e.g. Chai Khana" />
-      <div className="grid grid-cols-[1fr_8rem] gap-3">
-        <Field label="City" name="city" required maxLength={60} placeholder="Lahore" />
-        <Field label="Type" name="kind" maxLength={30} placeholder="café" />
-      </div>
+      <Field label="City" name="city" required maxLength={60} placeholder="Lahore" />
+      <label className="block">
+        <span className="text-sm font-medium">Type of business</span>
+        <span className="ml-2 text-xs text-muted">sets the questions customers see</span>
+        <select name="kind" defaultValue="café" className={`${inputCls} mt-1.5`}>
+          {BUSINESS_TYPES.map((t) => (
+            <option key={t.key} value={t.noun}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <Field label="Google review link" hint="optional: link or Place ID" name="googleReviewUrl" placeholder="https://g.page/r/…/review" />
     </>
   );

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Business, Lang, Sentiment } from "@/lib/store";
-import { LANGS, NOTE_MAX, OCCASIONS, googleLink } from "@/lib/options";
+import { LANGS, NOTE_MAX, googleLink } from "@/lib/options";
+import { typeOf } from "@/lib/business-types";
 import { shrinkImage } from "@/lib/image";
 
 const FEELINGS: { key: Sentiment; label: string; ur: string; color: string; mouth: string }[] = [
@@ -31,6 +32,7 @@ async function shrinkPhoto(file: File) {
 }
 
 export default function Flow({ business: b, ticketNo }: { business: Business; ticketNo: string }) {
+  const type = typeOf(b.kind); // questions, items and occasions for this kind of business
   const [step, setStep] = useState(0);
   const [sentiment, setSentiment] = useState<Sentiment | null>(null);
   const [picks, setPicks] = useState<string[]>([]);
@@ -170,7 +172,7 @@ export default function Flow({ business: b, ticketNo }: { business: Business; ti
             <>
               <div className="dashed my-7" />
               <p className="text-sm font-medium">
-                Anything you had? <span className="text-muted">optional</span>
+                {type.items.question} <span className="text-muted">optional</span>
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {b.menu.map((m) => {
@@ -197,7 +199,7 @@ export default function Flow({ business: b, ticketNo }: { business: Business; ti
             When / who with? <span className="text-muted">optional</span>
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {OCCASIONS.map((o) => {
+            {type.occasions.map((o) => {
               const on = occasions.includes(o);
               return (
                 <button
@@ -227,10 +229,11 @@ export default function Flow({ business: b, ticketNo }: { business: Business; ti
             maxLength={NOTE_MAX}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
-            placeholder="Anything else? English, Urdu or Roman Urdu is fine. e.g. chai bohat kadak thi"
+            placeholder="Anything else? English, Urdu or Roman Urdu is fine."
             className="mt-2 w-full resize-none rounded-xl border border-line bg-card px-3 py-2.5 text-[15px] outline-none transition placeholder:text-muted/70 focus:border-ink"
           />
 
+          {type.photo && (
           <div className="mt-4">
             {photo ? (
               <div className="flex items-center gap-3 rounded-xl border border-line bg-card p-2">
@@ -247,11 +250,12 @@ export default function Flow({ business: b, ticketNo }: { business: Business; ti
                   <path d="M4 8h3l2-3h6l2 3h3v11H4z" strokeLinejoin="round" />
                   <circle cx="12" cy="13" r="3.5" />
                 </svg>
-                Add a photo of your food <span className="text-muted">optional</span>
+                {type.photo?.label} <span className="text-muted">optional</span>
                 <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={onPhoto} className="sr-only" />
               </label>
             )}
           </div>
+          )}
 
           <div className="dashed my-7" />
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -302,7 +306,7 @@ export default function Flow({ business: b, ticketNo }: { business: Business; ti
             </p>
           )}
           {meta?.photo === "nothing-found" && (
-            <p className="mt-3 rounded-xl bg-card px-3 py-2 text-sm text-muted">📷 We couldn&apos;t spot food or drinks in your photo, so it wasn&apos;t used.</p>
+            <p className="mt-3 rounded-xl bg-card px-3 py-2 text-sm text-muted">📷 We couldn&apos;t spot {type.photo?.things ?? "anything useful"} in your photo, so it wasn&apos;t used.</p>
           )}
           {meta?.aiBusy && (
             <p className="mt-3 rounded-xl border border-mustard px-3 py-2 text-sm" role="status">

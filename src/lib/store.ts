@@ -3,6 +3,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./password.ts";
 import { TIME_ZONE, type PaymentMethod, type Plan } from "./options.ts";
+import { typeOf } from "./business-types.ts";
 
 export type Sentiment = "positive" | "neutral" | "negative";
 export type Lang = "en" | "ur" | "roman";
@@ -12,7 +13,7 @@ export type Business = {
   slug: string;
   name: string;
   city: string;
-  kind: string; // "café", "restaurant", ...
+  kind: string; // a BusinessType noun ("café", "clothing store", "school"...); see business-types.ts
   googleReviewUrl: string;
   menu: string[]; // products the customer can mention (they pick, we never force)
   highlights: Record<Sentiment, string[]>; // options shown per sentiment
@@ -459,19 +460,13 @@ export async function listBusinesses(ownerId: string): Promise<Business[]> {
 const slugify = (s: string) =>
   s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32) || "place";
 
-// Neutral starter options any café/restaurant can use; owners tailor them in Settings.
-const STARTER_HIGHLIGHTS: Business["highlights"] = {
-  positive: ["Food was tasty", "Friendly staff", "Quick service", "Clean place", "Good value for money", "Nice atmosphere"],
-  neutral: ["Food was fine", "Service was okay", "A bit crowded", "Average prices"],
-  negative: ["Food arrived cold", "Long wait", "Order was wrong", "Too pricey", "Place wasn't clean"],
-};
 
 /** Creates a business with a unique slug and starter options the owner can edit. */
 export async function createBusiness(input: Pick<Business, "name" | "city" | "kind" | "googleReviewUrl">, ownerId: string): Promise<Business> {
   const base = slugify(`${input.name} ${input.city}`);
   let slug = base;
   for (let i = 2; await getBusiness(slug); i++) slug = `${base}-${i}`;
-  const b: Business = { ...input, slug, ownerId, menu: [], highlights: structuredClone(STARTER_HIGHLIGHTS), defaultLang: "en" };
+  const b: Business = { ...input, slug, ownerId, menu: [], highlights: structuredClone(typeOf(input.kind).highlights), defaultLang: "en" }; // starter options for this kind of business; owners edit them in Settings
   if (useSupabase) {
     await sb("businesses", { method: "POST", body: JSON.stringify(toRow(b)) });
     return b;

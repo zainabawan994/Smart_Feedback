@@ -36,14 +36,14 @@ export default async function AdminLayout({ children, params }: { children: Reac
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
-      <aside className="border-b border-line px-4 py-4 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
+      <aside className="relative border-b border-line px-4 py-4 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
         <div className="flex items-center justify-between gap-3 lg:block">
           <Link href="/" className="shrink-0 font-display text-xl tracking-tight">
             Smart<span className="text-tomato">Feedback</span>
           </Link>
-          <div className="w-52 lg:mt-6 lg:w-auto">{switcher}</div>
+          <div className="min-w-0 flex-1 lg:mt-6">{switcher}</div>
+          <Nav slug={slug} superAdmin={isSuperAdmin(user)} />
         </div>
-        <Nav slug={slug} />
         <div className="hidden lg:mt-auto lg:block">
           <a href={`/r/${slug}`} target="_blank" className="block rounded-xl border border-ink px-3 py-2 text-center text-sm transition hover:bg-ink hover:text-paper">
             Customer page ↗
