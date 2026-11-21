@@ -1,0 +1,8 @@
+# Never upload secrets or local data with `vercel deploy` (settings live in Vercel's Environment Variables).
+.env*
+!.env.example
+data/
+.claude/
+.next/
+node_modules/
+*.tsbuildinfo
