@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Business, Lang, Sentiment } from "@/lib/store";
+import { LANGS, NOTE_MAX, OCCASIONS, googleLink } from "@/lib/options";
 
 const FEELINGS: { key: Sentiment; label: string; ur: string; color: string; mouth: string }[] = [
   { key: "positive", label: "Loved it", ur: "بہت اچھا", color: "var(--leaf)", mouth: "M14 27 Q22 35 30 27" },
@@ -23,18 +24,31 @@ function Face({ mouth, color }: { mouth: string; color: string }) {
 const post = (url: string, body: object) =>
   fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
-export default function Flow({ business: b }: { business: Business }) {
+/** Phone photos are 3-10 MB; shrink to ≤640px JPEG (~60 KB). Enough to recognise food, and far fewer model tokens (Groq free tier: 7k tokens/min). */
+async function shrinkPhoto(file: File) {
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1, 640 / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.8);
+}
+
+export default function Flow({ business: b, ticketNo }: { business: Business; ticketNo: string }) {
   const [step, setStep] = useState(0);
   const [sentiment, setSentiment] = useState<Sentiment | null>(null);
   const [picks, setPicks] = useState<string[]>([]);
   const [items, setItems] = useState<string[]>([]);
+  const [occasions, setOccasions] = useState<string[]>([]);
+  const [note, setNote] = useState("");
+  const [photo, setPhoto] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>(b.defaultLang);
   const [draft, setDraft] = useState("");
-  const [meta, setMeta] = useState<{ source: string; normalizedBy: string } | null>(null);
+  const [meta, setMeta] = useState<{ source: string; normalizedBy: string; photoSeen?: string; photo?: string; aiBusy?: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [ticketNo] = useState(() => String(Math.floor(Math.random() * 900) + 100));
 
   useEffect(() => {
     post("/api/event", { slug: b.slug, type: "visit" });
@@ -47,11 +61,11 @@ export default function Flow({ business: b }: { business: Business }) {
     setBusy(true);
     setError("");
     try {
-      const res = await post("/api/generate", { slug: b.slug, sentiment, picks, items, lang });
+      const res = await post("/api/generate", { slug: b.slug, sentiment, picks, items, occasions, note, photo, lang });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong");
       setDraft(json.text);
-      setMeta({ source: json.source, normalizedBy: json.normalizedBy });
+      setMeta(json);
       setStep(2);
     } catch (e) {
       setError((e as Error).message);
@@ -67,7 +81,20 @@ export default function Flow({ business: b }: { business: Business }) {
     setTimeout(() => setCopied(false), 2500);
   }
 
+  async function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setError("");
+    try {
+      setPhoto(await shrinkPhoto(file));
+    } catch {
+      setError("Couldn't read that photo. Try a JPG or PNG.");
+    }
+  }
+
   const rtl = lang === "ur";
+  const canDraft = picks.length > 0 || note.trim().length > 0 || photo !== null;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-4 pb-10 pt-6">
@@ -171,18 +198,79 @@ export default function Flow({ business: b }: { business: Business }) {
           )}
 
           <div className="dashed my-7" />
-          <div className="flex items-center justify-between">
+          <p className="text-sm font-medium">
+            When / who with? <span className="text-muted">optional</span>
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {OCCASIONS.map((o) => {
+              const on = occasions.includes(o);
+              return (
+                <button
+                  key={o}
+                  aria-pressed={on}
+                  onClick={() => toggle(occasions, setOccasions, o, 2)}
+                  className={`rounded-full border px-3 py-1.5 text-[13px] transition ${on ? "border-leaf bg-leaf text-paper" : "border-line hover:border-ink"}`}
+                >
+                  {o}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="dashed my-7" />
+          <label htmlFor="note" className="flex items-baseline justify-between text-sm font-medium">
+            <span>
+              In your own words <span className="text-muted">optional</span>
+            </span>
+            <span className="font-mono text-[11px] text-muted">
+              {note.length}/{NOTE_MAX}
+            </span>
+          </label>
+          <textarea
+            id="note"
+            value={note}
+            maxLength={NOTE_MAX}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            placeholder="Anything else? English, Urdu or Roman Urdu is fine. e.g. chai bohat kadak thi"
+            className="mt-2 w-full resize-none rounded-xl border border-line bg-card px-3 py-2.5 text-[15px] outline-none transition placeholder:text-muted/70 focus:border-ink"
+          />
+
+          <div className="mt-4">
+            {photo ? (
+              <div className="flex items-center gap-3 rounded-xl border border-line bg-card p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
+                <img src={photo} alt="Your photo" className="h-16 w-16 rounded-lg object-cover" />
+                <span className="flex-1 text-sm">AI will look at your photo and mention what it shows.</span>
+                <button onClick={() => setPhoto(null)} className="px-2 text-sm text-muted underline underline-offset-4 hover:text-ink">
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-line px-4 py-4 text-sm transition hover:border-ink focus-within:border-ink">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                  <path d="M4 8h3l2-3h6l2 3h3v11H4z" strokeLinejoin="round" />
+                  <circle cx="12" cy="13" r="3.5" />
+                </svg>
+                Add a photo of your food <span className="text-muted">optional</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={onPhoto} className="sr-only" />
+              </label>
+            )}
+          </div>
+
+          <div className="dashed my-7" />
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-sm font-medium">Write it in</span>
             <div className="flex rounded-full border border-line p-1" role="radiogroup" aria-label="Review language">
-              {(["en", "ur"] as Lang[]).map((l) => (
+              {LANGS.map((l) => (
                 <button
-                  key={l}
+                  key={l.key}
                   role="radio"
-                  aria-checked={lang === l}
-                  onClick={() => setLang(l)}
-                  className={`rounded-full px-4 py-1 text-sm ${lang === l ? "bg-ink text-paper" : "text-muted"} ${l === "ur" ? "urdu leading-normal" : ""}`}
+                  aria-checked={lang === l.key}
+                  onClick={() => setLang(l.key)}
+                  className={`rounded-full px-3.5 py-1 text-sm ${lang === l.key ? "bg-ink text-paper" : "text-muted"} ${l.key === "ur" ? "urdu !text-base !leading-normal" : ""}`}
                 >
-                  {l === "en" ? "English" : "اردو"}
+                  {l.label}
                 </button>
               ))}
             </div>
@@ -196,7 +284,7 @@ export default function Flow({ business: b }: { business: Business }) {
             </button>
             <button
               onClick={generate}
-              disabled={picks.length === 0 || busy}
+              disabled={!canDraft || busy}
               className="flex-1 rounded-full bg-tomato px-5 py-3.5 font-medium text-tomato-ink transition hover:brightness-110 disabled:opacity-40"
             >
               {busy ? "Writing your draft…" : "Draft my review"}
@@ -210,6 +298,23 @@ export default function Flow({ business: b }: { business: Business }) {
           <p className="font-mono text-xs text-tomato">03 / 03</p>
           <h1 className="mt-2 font-display text-[2.2rem] leading-[1.05] tracking-tight">Make it yours.</h1>
           <p className="mt-3 text-muted">This draft only uses what you picked. Change anything that doesn&apos;t sound like you.</p>
+          {meta?.photo === "used" && (
+            <p className="mt-3 flex gap-2 rounded-xl bg-card px-3 py-2 text-sm">
+              <span aria-hidden>📷</span>
+              <span>
+                <span className="font-medium">Seen in your photo:</span> <span className="text-muted">{meta.photoSeen}</span>
+              </span>
+            </p>
+          )}
+          {meta?.photo === "nothing-found" && (
+            <p className="mt-3 rounded-xl bg-card px-3 py-2 text-sm text-muted">📷 We couldn&apos;t spot food or drinks in your photo, so it wasn&apos;t used.</p>
+          )}
+          {meta?.aiBusy && (
+            <p className="mt-3 rounded-xl border border-mustard px-3 py-2 text-sm" role="status">
+              The AI is busy right now{meta.photo === "unreadable" ? " and couldn't read your photo" : ""}, so this is a simpler draft. Wait a minute and tap{" "}
+              <span className="font-medium">Try another wording</span>.
+            </p>
+          )}
 
           <div className="ticket print mt-6 rounded-t-2xl border-x border-t border-line p-5">
             <div className="flex justify-between font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
@@ -235,7 +340,7 @@ export default function Flow({ business: b }: { business: Business }) {
               {copied ? "Copied ✓  now paste it on Google" : "1 · Copy review"}
             </button>
             <a
-              href={b.googleReviewUrl}
+              href={googleLink(b)}
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => post("/api/event", { slug: b.slug, type: "google" })}
@@ -250,6 +355,7 @@ export default function Flow({ business: b }: { business: Business }) {
 
           <p className="mt-8 border-l-2 border-line pl-3 text-xs leading-relaxed text-muted">
             You post it yourself, from your own account. Nothing is posted for you.
+            {photo && <span className="mt-1 block">Add your photo on Google too, using the camera icon under the review box.</span>}
             {meta && (
               <span className="mt-1 block font-mono">
                 draft: {meta.source} · tidy: {meta.normalizedBy}

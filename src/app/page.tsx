@@ -20,7 +20,7 @@ export default function Home() {
         <span className="font-display text-xl tracking-tight">
           Smart<span className="text-tomato">Feedback</span>
         </span>
-        <Link href="/admin/chai-khana" className="text-sm underline decoration-line underline-offset-4 hover:decoration-ink">
+        <Link href="/login" className="text-sm underline decoration-line underline-offset-4 hover:decoration-ink">
           Owner desk
         </Link>
       </nav>
@@ -40,7 +40,7 @@ export default function Home() {
             <Link href="/r/chai-khana" className="rounded-full bg-tomato px-6 py-3.5 font-medium text-tomato-ink transition hover:brightness-110">
               Try it as a customer
             </Link>
-            <Link href="/admin/chai-khana" className="rounded-full border border-ink px-6 py-3.5 font-medium transition hover:bg-ink hover:text-paper">
+            <Link href="/login" className="rounded-full border border-ink px-6 py-3.5 font-medium transition hover:bg-ink hover:text-paper">
               See the owner desk
             </Link>
           </div>

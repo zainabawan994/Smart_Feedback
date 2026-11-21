@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
-import { getBusiness } from "@/lib/store";
+import { getBusiness, getStats } from "@/lib/store";
 import Flow from "./Flow";
 
 export default async function ReviewPage({ params }: { params: Promise<{ slug: string }> }) {
-  const b = await getBusiness((await params).slug);
+  const { slug } = await params;
+  const b = await getBusiness(slug);
   if (!b) notFound();
-  return <Flow business={b} />;
+  const ticketNo = String((await getStats(slug)).counts.visit + 1); // this visitor's real scan number
+  return <Flow business={{ ...b, ownerId: null }} ticketNo={ticketNo} />; // never send owner ids to the public page
 }

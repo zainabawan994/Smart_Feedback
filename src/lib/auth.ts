@@ -1,0 +1,75 @@
+import { timingSafeEqual } from "crypto";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { hmac } from "./secret.ts";
+import { getBusiness, getLoginAttempts, getUserById, putLoginAttempts, type Business, type User } from "./store";
+
+const COOKIE = "sf_session";
+const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
+
+// Cookie = userId.sessionVersion.expiry.signature. Bumping the user's sessionVersion
+// (password change/reset) invalidates every cookie issued before it.
+export async function startSession(user: Pick<User, "id" | "sessionVersion">) {
+  const payload = `${user.id}.${user.sessionVersion}.${Math.floor(Date.now() / 1000) + MAX_AGE}`;
+  (await cookies()).set(COOKIE, `${payload}.${hmac(payload)}`, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: MAX_AGE,
+  });
+}
+
+export async function endSession() {
+  (await cookies()).delete(COOKIE);
+}
+
+/** The signed-in user, verified or not. */
+export async function sessionUser(): Promise<User | null> {
+  const raw = (await cookies()).get(COOKIE)?.value;
+  const [userId, ver, exp, mac] = raw?.split(".") ?? [];
+  if (!userId || !ver || !exp || !mac) return null;
+  const expected = Buffer.from(hmac(`${userId}.${ver}.${exp}`));
+  const given = Buffer.from(mac);
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  if (Number(exp) < Date.now() / 1000) return null;
+  const user = await getUserById(userId);
+  return user && String(user.sessionVersion) === ver ? user : null;
+}
+
+/** The signed-in user only if their email is verified (what the owner desk needs). */
+export async function currentUser(): Promise<User | null> {
+  const user = await sessionUser();
+  return user?.emailVerified ? user : null;
+}
+
+/** For pages: the signed-in, verified owner of this business, or redirect. */
+export async function requireOwnerPage(slug: string): Promise<{ user: User; business: Business }> {
+  const user = await sessionUser();
+  if (!user) redirect(`/login?next=/admin/${encodeURIComponent(slug)}`);
+  if (!user.emailVerified) redirect("/verify");
+  const business = await getBusiness(slug);
+  if (!business || business.ownerId !== user.id) redirect("/admin");
+  return { user, business };
+}
+
+/** For API routes: the business if the signed-in, verified user owns it, else null. */
+export async function ownedBusiness(slug: string) {
+  const user = await currentUser();
+  const business = user && (await getBusiness(slug));
+  return business && business.ownerId === user!.id ? business : null;
+}
+
+// 5 wrong passwords lock that email for 15 minutes. Stored in the database so every server sees it.
+export async function loginBlocked(email: string) {
+  const a = await getLoginAttempts(email);
+  return Boolean(a && a.n >= 5 && a.until > Date.now());
+}
+export async function noteLoginFailure(email: string) {
+  const a = await getLoginAttempts(email);
+  const fresh = !a || a.until < Date.now();
+  await putLoginAttempts(email, { n: fresh ? 1 : a.n + 1, until: Date.now() + 15 * 60_000 });
+}
+export async function clearLoginFailures(email: string) {
+  await putLoginAttempts(email, null);
+}
