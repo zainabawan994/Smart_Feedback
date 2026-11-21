@@ -183,3 +183,23 @@ create function platform_businesses() returns table (
 $$;
 revoke execute on function platform_businesses() from public, anon, authenticated;
 grant execute on function platform_businesses() to service_role;
+
+-- Manual payments (bank transfer / Easypaisa / JazzCash): the owner reports a transaction ID, the super-admin approves.
+create table if not exists payments (
+  id         uuid primary key,
+  slug       text not null references businesses(slug) on delete cascade,
+  plan       text not null check (plan in ('monthly','6months','yearly')),
+  amount_pkr integer not null check (amount_pkr > 0),
+  method     text not null check (method in ('bank','easypaisa','jazzcash')),
+  reference  text not null,
+  payer      text not null,
+  status     text not null default 'pending' check (status in ('pending','approved','rejected')),
+  note       text,
+  created_at timestamptz not null default now(),
+  decided_at timestamptz,
+  unique (method, reference) -- the same receipt can't be used twice
+);
+create index if not exists payments_status_time on payments (status, created_at desc);
+create index if not exists payments_slug_time on payments (slug, created_at desc);
+alter table payments enable row level security;
+grant select, insert, update, delete on payments to service_role;

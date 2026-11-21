@@ -32,15 +32,34 @@ export function googleLink(b: { googleReviewUrl: string; name: string; city: str
 }
 
 /** Subscription plans the super-admin can set (payments are not wired up yet). */
+// pkr: what owners transfer (bank / Easypaisa / JazzCash). Matches the USD prices on the home page at about Rs 280 per dollar.
 export const PLANS = [
-  { key: "monthly", label: "Monthly", months: 1 },
-  { key: "6months", label: "6 Months", months: 6 },
-  { key: "yearly", label: "Yearly", months: 12 },
+  { key: "monthly", label: "Monthly", months: 1, usd: 12, pkr: 3400 },
+  { key: "6months", label: "6 Months", months: 6, usd: 60, pkr: 17000 },
+  { key: "yearly", label: "Yearly", months: 12, usd: 96, pkr: 27000 },
 ] as const;
 export type Plan = (typeof PLANS)[number]["key"];
 /** A plan key from a URL or form, or null if it isn't one. */
 export const asPlan = (v: unknown): Plan | null => PLANS.find((p) => p.key === v)?.key ?? null;
 export const planLabel = (p: Plan) => PLANS.find((x) => x.key === p)!.label;
+export const planInfo = (p: Plan) => PLANS.find((x) => x.key === p)!;
+export const rupees = (n: number) => `Rs ${n.toLocaleString("en-PK")}`;
+
+export const PAYMENT_METHODS = [
+  { key: "bank", label: "Bank transfer" },
+  { key: "easypaisa", label: "Easypaisa" },
+  { key: "jazzcash", label: "JazzCash" },
+] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number]["key"];
+
+/** New expiry when a payment is approved: renewals extend the current plan, otherwise it starts now. */
+export function planEnd(currentExpiry: string | null | undefined, months: number, now = new Date()) {
+  const cur = currentExpiry ? new Date(currentExpiry) : null;
+  const start = cur && cur > now ? cur : now;
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + months);
+  return end.toISOString();
+}
 
 /** Plan status the way the super-admin needs to read it at a glance. */
 export function planState(b: { plan?: Plan | null; planExpiresAt?: string | null; suspended?: boolean }, now = Date.now()) {

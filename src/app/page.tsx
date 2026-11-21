@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PLANS as PLAN_PRICES, rupees } from "@/lib/options";
 
 const STEPS = [
   ["Scan", "A QR card on the table opens a page. No app, no sign-up."],
@@ -132,6 +133,7 @@ export default function Home() {
                 <span className="text-muted">/ {p.period}</span>
               </p>
               <p className="mt-2 text-sm text-muted">{p.total}</p>
+              <p className="mt-1 text-sm text-muted">In Pakistan: {rupees(PLAN_PRICES.find((x) => x.key === p.key)!.pkr)} by bank transfer, Easypaisa or JazzCash</p>
               <p className={`mt-3 w-fit rounded-full px-2.5 py-0.5 font-mono text-[11px] ${p.popular ? "bg-mustard text-ink" : "border border-line text-muted"}`}>{p.note}</p>
               <div className="dashed my-5" />
               <ul className="grid gap-2 text-[15px]">

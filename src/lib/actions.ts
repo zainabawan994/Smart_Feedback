@@ -1,12 +1,14 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
-import { createBusiness, createUser, getBusiness, getUserByEmail, updateBusiness, updateUser } from "./store";
+import { createBusiness, createPayment, createUser, decidePayment, getBusiness, getUserByEmail, updateBusiness, updateUser } from "./store";
+import { paymentAccounts } from "./billing.ts";
 import { hashPassword, verifyPassword } from "./password.ts";
-import { PLANS, asPlan, normalizeReviewUrl, planLabel, type Plan } from "./options.ts";
+import { PLANS, asPlan, normalizeReviewUrl, planEnd, planInfo, planLabel, rupees, type Plan } from "./options.ts";
 import { TOO_MANY, allow, clientIp } from "./guard.ts";
 
 export type FormState = { error?: string; info?: string; sentAt?: number } | undefined;
@@ -207,16 +209,46 @@ export async function cancelEmailChange(f: FormData) {
   redirect(accountPage(f));
 }
 
-/** Owner picks a plan; it waits as a request until the super-admin switches it on (no payments yet). */
-export async function requestPlan(_: FormState, f: FormData): Promise<FormState> {
+/** Owner reports a transfer for a plan. It waits as "pending" until the super-admin checks the account and approves. */
+export async function submitPayment(_: FormState, f: FormData): Promise<FormState> {
   const user = await currentUser();
   if (!user) redirect("/login");
+  if (!(await allow("payment-submit", user.id, 5, 3600))) return { error: TOO_MANY };
   const business = await getBusiness(str(f, "slug", 40));
   if (!business || business.ownerId !== user.id) return { error: "Business not found." };
   const plan = asPlan(f.get("plan"));
   if (!plan) return { error: "Pick a plan." };
+  const method = paymentAccounts().find((a) => a.method === f.get("method"))?.method;
+  if (!method) return { error: "Pick how you paid." };
+  const reference = str(f, "reference", 60).replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9-]{6,60}$/.test(reference)) return { error: "Enter the transaction ID from your receipt (letters and numbers, at least 6)." };
+  const payer = str(f, "payer", 80);
+  if (!payer) return { error: "Enter the name or number you paid from, so we can find it." };
+  const payment = await createPayment({ slug: business.slug, plan, amountPkr: planInfo(plan).pkr, method, reference, payer });
+  if (!payment) return { error: "That transaction ID was already submitted." };
   await updateBusiness(business.slug, { requestedPlan: plan });
-  return { info: `${planLabel(plan)} plan requested. We'll switch it on once payment is confirmed.` };
+  revalidatePath(`/admin/${business.slug}/account`);
+  return { info: `Thanks! We received your ${planLabel(plan)} payment of ${rupees(planInfo(plan).pkr)}. Your plan switches on as soon as we confirm it, usually within a day.` };
+}
+
+/** Super-admin: approve (switch the plan on / extend it) or reject a reported payment. */
+export async function decidePaymentAction(f: FormData) {
+  const user = await currentUser();
+  if (!isSuperAdmin(user)) return;
+  const id = str(f, "id", 60);
+  const approve = f.get("decision") === "approve";
+  const note = approve ? null : str(f, "note", 200) || "We couldn't find this payment. Check the transaction ID and submit again.";
+  const payment = await decidePayment(id, approve ? "approved" : "rejected", note);
+  if (payment && approve) {
+    const business = await getBusiness(payment.slug);
+    if (business) {
+      // Renewing the same plan extends from the current end date; anything else starts today.
+      const keep = business.plan === payment.plan ? business.planExpiresAt : null;
+      await updateBusiness(payment.slug, { plan: payment.plan, planExpiresAt: planEnd(keep, planInfo(payment.plan).months), requestedPlan: null, suspended: false });
+    }
+  }
+  revalidatePath("/superadmin");
+  if (payment) revalidatePath(`/superadmin/${payment.slug}`);
 }
 
 /* ---------------- super-admin ---------------- */

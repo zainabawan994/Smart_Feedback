@@ -20,3 +20,14 @@ assert.deepEqual(planState({ plan: "monthly", planExpiresAt: in3 }, now), { labe
 assert.deepEqual(planState({ plan: "6months", planExpiresAt: "2026-11-01T00:00:00Z" }, now), { label: "6 Months · expired", tone: "bad" });
 assert.equal(planState({ plan: "yearly", planExpiresAt: "2027-11-21T00:00:00Z", suspended: true }, now).label, "Suspended");
 console.log("options.test plan state: ok");
+
+// Plan end on approval: fresh plans start now, renewals extend the current end date.
+{
+  const { planEnd, rupees } = await import("./options.ts");
+  const t = new Date("2026-11-21T12:00:00Z");
+  assert.equal(planEnd(null, 1, t), "2026-12-21T12:00:00.000Z");
+  assert.equal(planEnd("2026-11-01T00:00:00Z", 6, t), "2027-05-21T12:00:00.000Z"); // already expired: start today
+  assert.equal(planEnd("2027-01-10T00:00:00Z", 12, t), "2028-01-10T00:00:00.000Z"); // still active: extend
+  assert.equal(rupees(17000), "Rs 17,000");
+  console.log("options.test plan end: ok");
+}

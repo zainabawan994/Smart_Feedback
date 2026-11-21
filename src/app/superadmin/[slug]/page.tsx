@@ -2,10 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/auth";
 import { superAdminUpdateBusiness } from "@/lib/actions";
-import { getStats, listPlatformBusinesses } from "@/lib/store";
+import { getStats, listPayments, listPlatformBusinesses } from "@/lib/store";
 import { ActionForm, inputCls } from "@/components/forms";
 import { PageHeader, card, eyebrow, when } from "../../admin/[slug]/ui";
-import { PLANS, TIME_ZONE, planLabel, planState } from "@/lib/options";
+import { PAYMENT_METHODS, PLANS, TIME_ZONE, planLabel, planState, rupees } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "../ui";
 
 const dateInput = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date(iso)); // YYYY-MM-DD
@@ -13,7 +13,7 @@ const dateInput = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: 
 export default async function ManageBusiness({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const user = await requireSuperAdmin();
-  const [all, stats] = await Promise.all([listPlatformBusinesses(), getStats(slug)]);
+  const [all, stats, payments] = await Promise.all([listPlatformBusinesses(), getStats(slug), listPayments({ slug }, 20)]);
   const b = all.find((x) => x.slug === slug);
   if (!b) notFound();
   const c = stats.counts;
@@ -112,6 +112,35 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
           </div>
         </section>
       </div>
+
+      <section className={`${card} mt-6`}>
+        <h2 className="font-display text-2xl">Payments</h2>
+        {payments.length === 0 ? (
+          <p className="mt-2 text-sm text-muted">No payments reported yet.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-line text-sm">
+            {payments.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+                <span>
+                  {planLabel(p.plan)} · {rupees(p.amountPkr)} · {PAYMENT_METHODS.find((m) => m.key === p.method)?.label} · TID <span className="font-mono">{p.reference}</span> · from {p.payer}
+                  {p.note && <span className="block text-xs text-plum">{p.note}</span>}
+                </span>
+                <span className="flex items-center gap-3">
+                  <span className={p.status === "approved" ? "text-leaf" : p.status === "rejected" ? "text-plum" : "text-tomato"}>{p.status}</span>
+                  <span className="font-mono text-xs text-muted">{when(p.createdAt)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {payments.some((p) => p.status === "pending") && (
+          <p className="mt-3 text-sm">
+            <Link href="/superadmin" className="underline underline-offset-4">
+              Approve or reject it on the main page →
+            </Link>
+          </p>
+        )}
+      </section>
     </main>
   );
 }

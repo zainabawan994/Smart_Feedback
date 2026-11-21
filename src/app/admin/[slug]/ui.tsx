@@ -13,6 +13,9 @@ export const LANG_LABEL = { en: "English", roman: "Roman Urdu", ur: "اردو" }
 export const when = (iso: string) =>
   new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE });
 
+/** Calendar date with year, for plan end dates. */
+export const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: TIME_ZONE });
+
 export function PageHeader({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-4 border-b border-ink pb-5">

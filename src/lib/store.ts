@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./password.ts";
-import { TIME_ZONE, type Plan } from "./options.ts";
+import { TIME_ZONE, type PaymentMethod, type Plan } from "./options.ts";
 
 export type Sentiment = "positive" | "neutral" | "negative";
 export type Lang = "en" | "ur" | "roman";
@@ -23,6 +23,21 @@ export type Business = {
   plan?: Plan | null;
   planExpiresAt?: string | null; // ISO time
   requestedPlan?: Plan | null; // plan the owner picked on the pricing page, waiting for the super-admin to switch on
+};
+
+/** A manual payment (bank / Easypaisa / JazzCash) the owner reported; the super-admin approves or rejects it. */
+export type Payment = {
+  id: string;
+  slug: string;
+  plan: Plan;
+  amountPkr: number;
+  method: PaymentMethod;
+  reference: string; // transaction ID from the receipt
+  payer: string; // sender name or number, to find it in the statement
+  status: "pending" | "approved" | "rejected";
+  note: string | null; // reason when rejected
+  createdAt: string;
+  decidedAt: string | null;
 };
 
 /** One row of the super-admin's business list. */
@@ -107,7 +122,7 @@ const toRow = (b: Partial<Business>) => {
 
 // shortcut: single JSON file, no concurrency control. Fine for a demo; set SUPABASE_* for anything real.
 const FILE = path.join(process.cwd(), "data", "db.json");
-type DB = { businesses: Record<string, Business>; events: Record<string, Event[]>; users: Record<string, User>; drafts: Record<string, Draft[]>; codes: Record<string, Code>; insights: Record<string, Insight>; logins: Record<string, LoginAttempts> };
+type DB = { businesses: Record<string, Business>; events: Record<string, Event[]>; users: Record<string, User>; drafts: Record<string, Draft[]>; codes: Record<string, Code>; insights: Record<string, Insight>; logins: Record<string, LoginAttempts>; payments: Payment[] };
 
 const seed: Business = {
   slug: "chai-khana",
@@ -132,12 +147,13 @@ async function load(): Promise<DB> {
   try {
     db = JSON.parse(await fs.readFile(FILE, "utf8"));
   } catch {
-    db = { businesses: { [seed.slug]: { ...seed } }, events: { [seed.slug]: [] }, users: {}, drafts: {}, codes: {}, insights: {}, logins: {} };
+    db = { businesses: { [seed.slug]: { ...seed } }, events: { [seed.slug]: [] }, users: {}, drafts: {}, codes: {}, insights: {}, logins: {}, payments: [] };
   }
   db.users ??= {};
   db.codes ??= {};
   db.insights ??= {};
   db.logins ??= {};
+  db.payments ??= [];
   // Accounts made before verification existed: demo stays verified, others must verify.
   for (const u of Object.values(db.users)) {
     u.sessionVersion ??= 1;
@@ -315,6 +331,56 @@ export async function rateLimit(key: string, max: number, windowSec: number): Pr
   const next = !cur || cur.reset < now ? { n: 1, reset: now + windowSec * 1000 } : { n: cur.n + 1, reset: cur.reset };
   localHits.set(key, next);
   return next.n <= max;
+}
+
+/* ---- payments (manual transfers) ---- */
+
+type PaymentRow = { id: string; slug: string; plan: Plan; amount_pkr: number; method: PaymentMethod; reference: string; payer: string; status: Payment["status"]; note: string | null; created_at: string; decided_at: string | null };
+const paymentFromRow = (r: PaymentRow): Payment => ({ id: r.id, slug: r.slug, plan: r.plan, amountPkr: r.amount_pkr, method: r.method, reference: r.reference, payer: r.payer, status: r.status, note: r.note, createdAt: r.created_at, decidedAt: r.decided_at });
+
+/** Records a reported payment. Returns null if that transaction ID was already submitted for this method. */
+export async function createPayment(p: Pick<Payment, "slug" | "plan" | "amountPkr" | "method" | "reference" | "payer">): Promise<Payment | null> {
+  const payment: Payment = { ...p, id: randomUUID(), status: "pending", note: null, createdAt: new Date().toISOString(), decidedAt: null };
+  if (useSupabase) {
+    try {
+      await sb("payments", { method: "POST", body: JSON.stringify({ id: payment.id, slug: p.slug, plan: p.plan, amount_pkr: p.amountPkr, method: p.method, reference: p.reference, payer: p.payer }), headers: { Prefer: "return=minimal" } });
+    } catch (e) {
+      if (String(e).includes("23505")) return null; // unique (method, reference): same receipt twice
+      throw e;
+    }
+    return payment;
+  }
+  const db = await load();
+  if (db.payments.some((x) => x.method === p.method && x.reference.toLowerCase() === p.reference.toLowerCase())) return null;
+  db.payments.unshift(payment);
+  await save(db);
+  return payment;
+}
+
+/** Newest first. Filter by business and/or status. */
+export async function listPayments(filter: { slug?: string; status?: Payment["status"] } = {}, limit = 100): Promise<Payment[]> {
+  if (useSupabase) {
+    const q = [filter.slug && `slug=eq.${encodeURIComponent(filter.slug)}`, filter.status && `status=eq.${filter.status}`].filter(Boolean).join("&");
+    const rows: PaymentRow[] = await sb(`payments?select=*${q ? `&${q}` : ""}&order=created_at.desc&limit=${limit}`);
+    return rows.map(paymentFromRow);
+  }
+  return (await load()).payments.filter((p) => (!filter.slug || p.slug === filter.slug) && (!filter.status || p.status === filter.status)).slice(0, limit);
+}
+
+/** Moves a pending payment to approved/rejected. Returns it, or null if it was already decided (no double approval). */
+export async function decidePayment(id: string, status: "approved" | "rejected", note: string | null): Promise<Payment | null> {
+  const decidedAt = new Date().toISOString();
+  if (useSupabase) {
+    // status=eq.pending in the filter makes this a compare-and-set: two clicks can't both approve.
+    const rows: PaymentRow[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&status=eq.pending`, { method: "PATCH", body: JSON.stringify({ status, note, decided_at: decidedAt }) });
+    return rows[0] ? paymentFromRow(rows[0]) : null;
+  }
+  const db = await load();
+  const p = db.payments.find((x) => x.id === id && x.status === "pending");
+  if (!p) return null;
+  Object.assign(p, { status, note, decidedAt });
+  await save(db);
+  return p;
 }
 
 /* ---- super-admin: whole platform ---- */

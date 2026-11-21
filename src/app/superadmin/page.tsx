@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/auth";
-import { listPlatformBusinesses, listPlatformUsers } from "@/lib/store";
-import { PageHeader, card, eyebrow, when } from "../admin/[slug]/ui";
-import { planLabel, planState } from "@/lib/options";
+import { decidePaymentAction } from "@/lib/actions";
+import { listPayments, listPlatformBusinesses, listPlatformUsers } from "@/lib/store";
+import { PageHeader, card, day, eyebrow, when } from "../admin/[slug]/ui";
+import { PAYMENT_METHODS, planLabel, planState, rupees } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "./ui";
 
 export default async function SuperAdmin() {
   const user = await requireSuperAdmin();
-  const [businesses, users] = await Promise.all([listPlatformBusinesses(), listPlatformUsers()]);
+  const [businesses, users, pending] = await Promise.all([listPlatformBusinesses(), listPlatformUsers(), listPayments({ status: "pending" })]);
+  const nameOf = (slug: string) => businesses.find((b) => b.slug === slug)?.name ?? slug;
   const states = businesses.map((b) => planState(b));
   const totals = [
     { label: "Businesses", n: businesses.length },
@@ -15,7 +17,7 @@ export default async function SuperAdmin() {
     { label: "On a plan", n: states.filter((s) => s.tone === "ok" || s.tone === "warn").length },
     { label: "Expired or no plan", n: states.filter((s) => s.label === "No plan" || s.label.endsWith("expired")).length },
     { label: "Suspended", n: businesses.filter((b) => b.suspended).length },
-    { label: "Plan requests", n: businesses.filter((b) => b.requestedPlan).length },
+    { label: "Payments to review", n: pending.length },
     { label: "QR scans", n: businesses.reduce((s, b) => s + b.visits, 0) },
     { label: "Drafts", n: businesses.reduce((s, b) => s + b.drafts, 0) },
   ];
@@ -35,6 +37,37 @@ export default async function SuperAdmin() {
           </div>
         ))}
       </section>
+
+      {pending.length > 0 && (
+        <section className={`${card} mt-6 border-tomato`} aria-label="Payments to review">
+          <h2 className="font-display text-2xl">Payments to review</h2>
+          <p className="mt-1 text-sm text-muted">Find each one in your bank / Easypaisa / JazzCash statement, then approve it. Approving switches the plan on (or extends it).</p>
+          <ul className="mt-4 grid gap-3">
+            {pending.map((p) => (
+              <li key={p.id} className="grid gap-3 rounded-xl border border-line bg-paper p-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div className="text-sm">
+                  <p>
+                    <span className="font-medium">{nameOf(p.slug)}</span> · {planLabel(p.plan)} · <span className="font-mono">{rupees(p.amountPkr)}</span>
+                  </p>
+                  <p className="mt-0.5 text-muted">
+                    {PAYMENT_METHODS.find((m) => m.key === p.method)?.label} · TID <span className="font-mono text-ink">{p.reference}</span> · from {p.payer} · {when(p.createdAt)}
+                  </p>
+                </div>
+                <form action={decidePaymentAction} className="flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="id" value={p.id} />
+                  <input name="note" placeholder="Reason if rejecting" maxLength={200} className="w-44 rounded-lg border border-line bg-card px-2.5 py-1.5 text-sm" aria-label="Reason if rejecting" />
+                  <button name="decision" value="reject" className="rounded-full border border-plum px-3 py-1.5 text-sm text-plum transition hover:bg-plum hover:text-paper">
+                    Reject
+                  </button>
+                  <button name="decision" value="approve" className="rounded-full bg-leaf px-4 py-1.5 text-sm text-paper transition hover:opacity-90">
+                    Approve
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className={`${card} mt-6 p-0`}>
         <h2 className="px-5 pt-5 font-display text-2xl">Businesses</h2>
@@ -63,7 +96,7 @@ export default async function SuperAdmin() {
                   <td className="px-3 py-3">{b.ownerEmail ?? <span className="text-muted">no owner</span>}</td>
                   <td className="px-3 py-3">
                     <StateBadge state={states[i]} />
-                    {b.planExpiresAt && !b.suspended && <span className="block text-xs text-muted">until {when(b.planExpiresAt)}</span>}
+                    {b.planExpiresAt && !b.suspended && <span className="block text-xs text-muted">until {day(b.planExpiresAt)}</span>}
                     {b.requestedPlan && <span className="mt-1 block text-xs font-medium text-tomato">requested: {planLabel(b.requestedPlan)}</span>}
                   </td>
                   <td className="px-3 py-3 text-right font-mono tabular-nums">{b.visits}</td>
