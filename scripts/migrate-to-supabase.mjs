@@ -32,7 +32,9 @@ const asUuid = (slug, id) => {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 };
 
-const users = Object.values(db.users ?? {});
+// The local demo owner's password is public (src/lib/store.ts), so it must never reach the real database.
+const DEMO_EMAIL = "owner@chaikhana.test";
+const users = Object.values(db.users ?? {}).filter((u) => u.email.toLowerCase() !== DEMO_EMAIL);
 await upsert("users", users.map((u) => ({
   id: u.id, email: u.email.toLowerCase(), password_hash: u.passwordHash, created_at: u.createdAt,
   email_verified: u.emailVerified ?? false, session_version: u.sessionVersion ?? 1,

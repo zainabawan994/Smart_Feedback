@@ -11,7 +11,7 @@ npm test        # normalizer + stats checks
 ```
 
 - Customer page: `/r/chai-khana`
-- Owner desk: `/login` (demo account `owner@chaikhana.test` / `chai-demo-2026`, created automatically for the local demo café), or `/signup` to create your own business
+- Owner desk: `/signup` to create your own business, then `/login`. Without Supabase (local `data/db.json` only), a demo owner for the demo café is created automatically; see `DEMO_OWNER` in `src/lib/store.ts`. It is never copied to Supabase.
 
 Works with no config: template draft, rule-based tidy-up, data in `data/db.json`.
 
@@ -75,7 +75,7 @@ Without config the app uses `data/db.json` (one process, no locking: demo only).
 1. Create a free project at supabase.com.
 2. SQL editor → paste `supabase/schema.sql` → Run. Re-running it is safe and upgrades older databases.
 3. Project Settings → API: put `SUPABASE_URL` and the `service_role` key as `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` (server-only, never `NEXT_PUBLIC_`).
-4. Copy what's in `data/db.json` (accounts incl. the demo owner, businesses, events, drafts, AI summaries):
+4. Copy what's in `data/db.json` (accounts except the demo owner, businesses, events, drafts, AI summaries):
 
 ```bash
 node --env-file=.env.local scripts/migrate-to-supabase.mjs

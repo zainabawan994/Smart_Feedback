@@ -36,8 +36,7 @@ export function googleLink(b: { googleReviewUrl: string; name: string; city: str
 /** Subscription plans the super-admin can set (payments are not wired up yet). */
 // pkr: what owners transfer (bank / Easypaisa / JazzCash). Matches the USD prices on the home page at about Rs 280 per dollar.
 export const PLANS = [
-  // shortcut: Rs 20 so the owner can test a real transfer cheaply; set back to 3400 before launch.
-  { key: "monthly", label: "Monthly", months: 1, usd: 12, pkr: 20 },
+  { key: "monthly", label: "Monthly", months: 1, usd: 12, pkr: 3400 },
   { key: "6months", label: "6 Months", months: 6, usd: 60, pkr: 17000 },
   { key: "yearly", label: "Yearly", months: 12, usd: 96, pkr: 27000 },
 ] as const;
