@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireOwnerPage } from "@/lib/auth";
+import { isSuperAdmin, requireOwnerPage } from "@/lib/auth";
 import { cancelPayment, cancelPlan, submitPayment } from "@/lib/actions";
 import { listPayments, type Payment } from "@/lib/store";
 import { PAYMENT_METHODS, PLANS, asPlan, daysUntil, isFuture, planLabel, planState, rupees } from "@/lib/options";
@@ -21,7 +21,9 @@ const btn = "rounded-full border border-ink px-4 py-2 text-sm transition hover:b
 export default async function BillingPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ plan?: string }> }) {
   const { slug } = await params;
   const picked = asPlan((await searchParams).plan);
-  const { business: b, readOnly } = await requireOwnerPage(slug);
+  const { user, business: b, readOnly } = await requireOwnerPage(slug);
+  // The platform owner doesn't pay herself: her businesses get plans straight from the super-admin panel.
+  const platformOwner = isSuperAdmin(user);
   const payments = await listPayments({ slug }, 50);
   const accounts = paymentAccounts();
   const pending = payments.find((p) => p.status === "pending");
@@ -107,8 +109,18 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
         </section>
       )}
 
+      {platformOwner && !readOnly && (
+        <section className={`${card} mt-6`}>
+          <h2 className="font-display text-2xl">You run SmartFeedback</h2>
+          <p className="mt-1 text-sm text-muted">As super admin you don&apos;t buy plans for your own businesses. Set this one&apos;s plan directly.</p>
+          <Link href={`/superadmin/${slug}`} className="mt-4 inline-block rounded-full bg-ink px-5 py-2.5 text-sm text-paper transition hover:opacity-90">
+            Set plan in super admin →
+          </Link>
+        </section>
+      )}
+
       {/* Buy / renew */}
-      {!readOnly && !pending && (
+      {!readOnly && !pending && !platformOwner && (
         <section className={`${card} mt-6`}>
           <h2 className="font-display text-2xl">{active ? "Renew or change plan" : "Buy a plan"}</h2>
           {active && <p className="mt-1 text-sm text-muted">Renewing the same plan adds its time after your current end date.</p>}
