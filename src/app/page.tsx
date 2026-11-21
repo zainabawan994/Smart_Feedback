@@ -13,6 +13,22 @@ const PROMISES = [
   ["The customer posts", "We never post for anyone. They read it, change it, and send it themselves."],
 ];
 
+// Every plan has every feature; longer terms just cost less per month.
+const PLANS = [
+  { name: "Monthly", price: 12, period: "month", total: "Billed $12 every month", note: "Cancel any time" },
+  { name: "6 Months", price: 60, period: "6 months", total: "$10 a month, billed $60 every 6 months", note: "Save 17%", popular: true },
+  { name: "Yearly", price: 96, period: "year", total: "$8 a month, billed $96 every year", note: "Save 33% · best value" },
+];
+
+const INCLUDED = [
+  "Unlimited QR scans and review drafts",
+  "English, Roman Urdu and اردو drafts",
+  "Owner desk: overview, issues and drafts",
+  "AI summary of complaints with fixes",
+  "Printable QR table card",
+  "ESP32 feedback station support",
+];
+
 export default function Home() {
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-8">
@@ -20,9 +36,14 @@ export default function Home() {
         <span className="font-display text-xl tracking-tight">
           Smart<span className="text-tomato">Feedback</span>
         </span>
-        <Link href="/login" className="text-sm underline decoration-line underline-offset-4 hover:decoration-ink">
-          Owner desk
-        </Link>
+        <div className="flex items-center gap-5 text-sm">
+          <a href="#pricing" className="underline decoration-line underline-offset-4 hover:decoration-ink">
+            Pricing
+          </a>
+          <Link href="/login" className="underline decoration-line underline-offset-4 hover:decoration-ink">
+            Owner desk
+          </Link>
+        </div>
       </nav>
 
       <section className="grid items-center gap-12 py-10 sm:py-16 lg:grid-cols-[1.25fr_1fr]">
@@ -85,6 +106,48 @@ export default function Home() {
             </li>
           ))}
         </ol>
+      </section>
+
+      <section id="pricing" className="scroll-mt-6 border-t border-ink py-14">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="font-display text-3xl tracking-tight sm:text-4xl">Plans for your business</h2>
+            <p className="mt-2 max-w-xl text-muted">One location per plan, every feature included. Pick how long you want to pay for; longer plans cost less each month.</p>
+          </div>
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Prices in USD</p>
+        </div>
+
+        <ul className="mt-8 grid gap-4 md:grid-cols-3">
+          {PLANS.map((p) => (
+            <li key={p.name} className={`relative flex flex-col rounded-2xl border bg-card p-6 ${p.popular ? "border-tomato shadow-[0_20px_40px_-25px_rgb(0_0_0/0.35)]" : "border-line"}`}>
+              {p.popular && (
+                <span className="absolute -top-3 left-6 rounded-full bg-tomato px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-tomato-ink">Most popular</span>
+              )}
+              <h3 className="font-display text-2xl">{p.name}</h3>
+              <p className="mt-4 flex items-baseline gap-1">
+                <span className="font-display text-5xl tabular-nums">${p.price}</span>
+                <span className="text-muted">/ {p.period}</span>
+              </p>
+              <p className="mt-2 text-sm text-muted">{p.total}</p>
+              <p className={`mt-3 w-fit rounded-full px-2.5 py-0.5 font-mono text-[11px] ${p.popular ? "bg-mustard text-ink" : "border border-line text-muted"}`}>{p.note}</p>
+              <div className="dashed my-5" />
+              <ul className="grid gap-2 text-[15px]">
+                {INCLUDED.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <span aria-hidden className="text-leaf">✓</span>
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/signup"
+                className={`mt-6 rounded-full px-5 py-3 text-center font-medium transition ${p.popular ? "bg-tomato text-tomato-ink hover:brightness-110" : "border border-ink hover:bg-ink hover:text-paper"}`}
+              >
+                Choose {p.name}
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="grid gap-10 border-t border-ink py-14 lg:grid-cols-[1fr_2fr]">
