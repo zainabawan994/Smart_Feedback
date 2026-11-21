@@ -15,9 +15,9 @@ const PROMISES = [
 
 // Every plan has every feature; longer terms just cost less per month.
 const PLANS = [
-  { name: "Monthly", price: 12, period: "month", total: "Billed $12 every month", note: "Cancel any time" },
-  { name: "6 Months", price: 60, period: "6 months", total: "$10 a month, billed $60 every 6 months", note: "Save 17%", popular: true },
-  { name: "Yearly", price: 96, period: "year", total: "$8 a month, billed $96 every year", note: "Save 33% · best value" },
+  { key: "monthly", name: "Monthly", price: 12, period: "month", total: "Billed $12 every month", note: "Cancel any time" },
+  { key: "6months", name: "6 Months", price: 60, period: "6 months", total: "$10 a month, billed $60 every 6 months", note: "Save 17%", popular: true },
+  { key: "yearly", name: "Yearly", price: 96, period: "year", total: "$8 a month, billed $96 every year", note: "Save 33% · best value" },
 ];
 
 const INCLUDED = [
@@ -36,12 +36,15 @@ export default function Home() {
         <span className="font-display text-xl tracking-tight">
           Smart<span className="text-tomato">Feedback</span>
         </span>
-        <div className="flex items-center gap-5 text-sm">
-          <a href="#pricing" className="underline decoration-line underline-offset-4 hover:decoration-ink">
+        <div className="flex items-center gap-3 text-sm sm:gap-5">
+          <a href="#pricing" className="hidden underline decoration-line underline-offset-4 hover:decoration-ink sm:inline">
             Pricing
           </a>
           <Link href="/login" className="underline decoration-line underline-offset-4 hover:decoration-ink">
-            Owner desk
+            Log in
+          </Link>
+          <Link href="/signup" className="rounded-full bg-ink px-4 py-2 text-paper transition hover:opacity-90">
+            Sign up
           </Link>
         </div>
       </nav>
@@ -140,7 +143,7 @@ export default function Home() {
                 ))}
               </ul>
               <Link
-                href="/signup"
+                href={`/signup?plan=${p.key}`}
                 className={`mt-6 rounded-full px-5 py-3 text-center font-medium transition ${p.popular ? "bg-tomato text-tomato-ink hover:brightness-110" : "border border-ink hover:bg-ink hover:text-paper"}`}
               >
                 Choose {p.name}
@@ -148,6 +151,13 @@ export default function Home() {
             </li>
           ))}
         </ul>
+        <p className="mt-5 text-sm text-muted">
+          Already have an account?{" "}
+          <Link href="/login" className="text-ink underline underline-offset-4">
+            Log in
+          </Link>{" "}
+          and pick a plan from your Account page.
+        </p>
       </section>
 
       <section className="grid gap-10 border-t border-ink py-14 lg:grid-cols-[1fr_2fr]">

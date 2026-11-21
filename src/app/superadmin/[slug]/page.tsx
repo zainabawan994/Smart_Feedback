@@ -5,7 +5,7 @@ import { superAdminUpdateBusiness } from "@/lib/actions";
 import { getStats, listPlatformBusinesses } from "@/lib/store";
 import { ActionForm, inputCls } from "@/components/forms";
 import { PageHeader, card, eyebrow, when } from "../../admin/[slug]/ui";
-import { PLANS, TIME_ZONE, planState } from "@/lib/options";
+import { PLANS, TIME_ZONE, planLabel, planState } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "../ui";
 
 const dateInput = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(new Date(iso)); // YYYY-MM-DD
@@ -45,6 +45,11 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
         <section className={card}>
           <h2 className="font-display text-2xl">Controls</h2>
           <p className="mb-5 mt-1 text-sm text-muted">Suspending switches off the customer page and pauses the owner&apos;s desk. Nothing is deleted.</p>
+          {b.requestedPlan && (
+            <p className="mb-5 rounded-lg border border-tomato px-3 py-2 text-sm">
+              Owner requested the <span className="font-medium">{planLabel(b.requestedPlan)}</span> plan. Choose it below and save to switch it on.
+            </p>
+          )}
           <ActionForm action={superAdminUpdateBusiness} submit="Save">
             <input type="hidden" name="slug" value={b.slug} />
             <label className="flex items-center gap-3 rounded-lg border border-line px-3 py-3">
@@ -56,7 +61,7 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
             </label>
             <label className="block">
               <span className="text-sm font-medium">Plan</span>
-              <select name="plan" defaultValue={b.plan ?? ""} className={`${inputCls} mt-1.5`}>
+              <select name="plan" defaultValue={b.plan ?? b.requestedPlan ?? ""} className={`${inputCls} mt-1.5`}>
                 <option value="">No plan</option>
                 {PLANS.map((p) => (
                   <option key={p.key} value={p.key}>

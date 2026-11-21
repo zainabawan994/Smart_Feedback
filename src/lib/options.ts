@@ -38,6 +38,9 @@ export const PLANS = [
   { key: "yearly", label: "Yearly", months: 12 },
 ] as const;
 export type Plan = (typeof PLANS)[number]["key"];
+/** A plan key from a URL or form, or null if it isn't one. */
+export const asPlan = (v: unknown): Plan | null => PLANS.find((p) => p.key === v)?.key ?? null;
+export const planLabel = (p: Plan) => PLANS.find((x) => x.key === p)!.label;
 
 /** Plan status the way the super-admin needs to read it at a glance. */
 export function planState(b: { plan?: Plan | null; planExpiresAt?: string | null; suspended?: boolean }, now = Date.now()) {

@@ -6,7 +6,7 @@ import { clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
 import { createBusiness, createUser, getBusiness, getUserByEmail, updateBusiness, updateUser } from "./store";
 import { hashPassword, verifyPassword } from "./password.ts";
-import { PLANS, normalizeReviewUrl, type Plan } from "./options.ts";
+import { PLANS, asPlan, normalizeReviewUrl, planLabel, type Plan } from "./options.ts";
 import { TOO_MANY, allow, clientIp } from "./guard.ts";
 
 export type FormState = { error?: string; info?: string; sentAt?: number } | undefined;
@@ -58,7 +58,9 @@ export async function signup(_: FormState, f: FormData): Promise<FormState> {
   if (!place) return { error };
   const user = await createUser(email, pw.password);
   if (!user) return { error: "That email already has an account. Log in instead." };
-  await createBusiness(place, user.id);
+  const business = await createBusiness(place, user.id);
+  const plan = asPlan(f.get("plan"));
+  if (plan) await updateBusiness(business.slug, { requestedPlan: plan }); // picked on the pricing page
   await startSession(user);
   const sent = await trySend(email, "verify");
   redirect("failed" in sent ? "/verify?unsent=1" : "/verify");
@@ -80,7 +82,8 @@ export async function login(_: FormState, f: FormData): Promise<FormState> {
     const sent = await trySend(email, "verify"); // no-op if one was sent in the last minute
     redirect("failed" in sent ? "/verify?unsent=1" : "/verify");
   }
-  redirect(safeNext(str(f, "next", 200)));
+  const plan = asPlan(f.get("plan"));
+  redirect(plan ? `/admin/plan?plan=${plan}` : safeNext(str(f, "next", 200)));
 }
 
 export async function logout() {
@@ -204,6 +207,18 @@ export async function cancelEmailChange(f: FormData) {
   redirect(accountPage(f));
 }
 
+/** Owner picks a plan; it waits as a request until the super-admin switches it on (no payments yet). */
+export async function requestPlan(_: FormState, f: FormData): Promise<FormState> {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  const business = await getBusiness(str(f, "slug", 40));
+  if (!business || business.ownerId !== user.id) return { error: "Business not found." };
+  const plan = asPlan(f.get("plan"));
+  if (!plan) return { error: "Pick a plan." };
+  await updateBusiness(business.slug, { requestedPlan: plan });
+  return { info: `${planLabel(plan)} plan requested. We'll switch it on once payment is confirmed.` };
+}
+
 /* ---------------- super-admin ---------------- */
 
 /** Suspend / resume a business and set its plan. Expiry left empty = today + the plan's length. */
@@ -227,7 +242,8 @@ export async function superAdminUpdateBusiness(_: FormState, f: FormData): Promi
       planExpiresAt = d.toISOString();
     }
   }
-  await updateBusiness(slug, { suspended: f.get("suspended") === "on", plan: (plan?.key ?? null) as Plan | null, planExpiresAt });
+  // Switching a plan on answers the owner's request, so clear it.
+  await updateBusiness(slug, { suspended: f.get("suspended") === "on", plan: (plan?.key ?? null) as Plan | null, planExpiresAt, ...(plan ? { requestedPlan: null } : {}) });
   return { info: "Saved." };
 }
 

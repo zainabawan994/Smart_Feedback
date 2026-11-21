@@ -22,6 +22,7 @@ export type Business = {
   suspended?: boolean; // true = customer page and owner desk are switched off
   plan?: Plan | null;
   planExpiresAt?: string | null; // ISO time
+  requestedPlan?: Plan | null; // plan the owner picked on the pricing page, waiting for the super-admin to switch on
 };
 
 /** One row of the super-admin's business list. */
@@ -94,10 +95,10 @@ async function sb(pathAndQuery: string, init: RequestInit = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-type Row = { slug: string; name: string; city: string; kind: string; google_review_url: string; menu: string[]; highlights: Business["highlights"]; default_lang: Lang; owner_id: string | null; suspended?: boolean; plan?: Plan | null; plan_expires_at?: string | null };
-const fromRow = (r: Row): Business => ({ slug: r.slug, name: r.name, city: r.city, kind: r.kind, googleReviewUrl: r.google_review_url, menu: r.menu, highlights: r.highlights, defaultLang: r.default_lang, ownerId: r.owner_id, suspended: r.suspended ?? false, plan: r.plan ?? null, planExpiresAt: r.plan_expires_at ?? null });
+type Row = { slug: string; name: string; city: string; kind: string; google_review_url: string; menu: string[]; highlights: Business["highlights"]; default_lang: Lang; owner_id: string | null; suspended?: boolean; plan?: Plan | null; plan_expires_at?: string | null; requested_plan?: Plan | null };
+const fromRow = (r: Row): Business => ({ slug: r.slug, name: r.name, city: r.city, kind: r.kind, googleReviewUrl: r.google_review_url, menu: r.menu, highlights: r.highlights, defaultLang: r.default_lang, ownerId: r.owner_id, suspended: r.suspended ?? false, plan: r.plan ?? null, planExpiresAt: r.plan_expires_at ?? null, requestedPlan: r.requested_plan ?? null });
 const toRow = (b: Partial<Business>) => {
-  const r: Partial<Row> = { slug: b.slug, name: b.name, city: b.city, kind: b.kind, google_review_url: b.googleReviewUrl, menu: b.menu, highlights: b.highlights, default_lang: b.defaultLang, owner_id: b.ownerId, suspended: b.suspended, plan: b.plan, plan_expires_at: b.planExpiresAt };
+  const r: Partial<Row> = { slug: b.slug, name: b.name, city: b.city, kind: b.kind, google_review_url: b.googleReviewUrl, menu: b.menu, highlights: b.highlights, default_lang: b.defaultLang, owner_id: b.ownerId, suspended: b.suspended, plan: b.plan, plan_expires_at: b.planExpiresAt, requested_plan: b.requestedPlan };
   for (const k of Object.keys(r) as (keyof Row)[]) if (r[k] === undefined) delete r[k];
   return r;
 };

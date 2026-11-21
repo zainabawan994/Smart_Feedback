@@ -136,3 +136,12 @@ export function AuthCard({ eyebrow, title, children, footer }: { eyebrow: string
     </main>
   );
 }
+
+/** Shown on sign-up and log-in when the visitor came from a pricing button. */
+export function PlanNote({ label }: { label: string }) {
+  return (
+    <p className="-mt-2 mb-5 rounded-lg border border-mustard px-3 py-2 text-sm">
+      <span className="font-medium">{label} plan selected.</span> Continue and we&apos;ll switch it on for your business once payment is confirmed.
+    </p>
+  );
+}

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/auth";
 import { listPlatformBusinesses, listPlatformUsers } from "@/lib/store";
 import { PageHeader, card, eyebrow, when } from "../admin/[slug]/ui";
-import { planState } from "@/lib/options";
+import { planLabel, planState } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "./ui";
 
 export default async function SuperAdmin() {
@@ -15,6 +15,7 @@ export default async function SuperAdmin() {
     { label: "On a plan", n: states.filter((s) => s.tone === "ok" || s.tone === "warn").length },
     { label: "Expired or no plan", n: states.filter((s) => s.label === "No plan" || s.label.endsWith("expired")).length },
     { label: "Suspended", n: businesses.filter((b) => b.suspended).length },
+    { label: "Plan requests", n: businesses.filter((b) => b.requestedPlan).length },
     { label: "QR scans", n: businesses.reduce((s, b) => s + b.visits, 0) },
     { label: "Drafts", n: businesses.reduce((s, b) => s + b.drafts, 0) },
   ];
@@ -26,7 +27,7 @@ export default async function SuperAdmin() {
         <PageHeader eyebrow="Whole platform" title="All businesses" />
       </div>
 
-      <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4 lg:grid-cols-7" aria-label="Totals">
+      <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4 lg:grid-cols-8" aria-label="Totals">
         {totals.map((t) => (
           <div key={t.label} className="bg-card p-4">
             <p className={eyebrow}>{t.label}</p>
@@ -63,6 +64,7 @@ export default async function SuperAdmin() {
                   <td className="px-3 py-3">
                     <StateBadge state={states[i]} />
                     {b.planExpiresAt && !b.suspended && <span className="block text-xs text-muted">until {when(b.planExpiresAt)}</span>}
+                    {b.requestedPlan && <span className="mt-1 block text-xs font-medium text-tomato">requested: {planLabel(b.requestedPlan)}</span>}
                   </td>
                   <td className="px-3 py-3 text-right font-mono tabular-nums">{b.visits}</td>
                   <td className="px-3 py-3 text-right font-mono tabular-nums">{b.drafts}</td>
