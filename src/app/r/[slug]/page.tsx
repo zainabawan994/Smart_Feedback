@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
-import { countVisits, getBusiness } from "@/lib/store";
+import { getBusiness } from "@/lib/store";
 import Flow from "./Flow";
 
 export default async function ReviewPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [b, visits] = await Promise.all([getBusiness(slug), countVisits(slug)]);
+  const b = await getBusiness(slug);
   if (!b) notFound();
   if (b.suspended)
     return (
@@ -14,6 +14,5 @@ export default async function ReviewPage({ params }: { params: Promise<{ slug: s
         <p className="mt-2 text-muted">Thanks for stopping by. Please try again later.</p>
       </main>
     );
-  const ticketNo = String(visits + 1); // this visitor's real scan number
-  return <Flow business={{ ...b, ownerId: null, plan: null, planExpiresAt: null }} ticketNo={ticketNo} />; // never send owner ids or plan details to the public page
+  return <Flow business={{ ...b, ownerId: null, plan: null, planExpiresAt: null }} />; // never send owner ids or plan details to the public page
 }

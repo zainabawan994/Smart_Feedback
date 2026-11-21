@@ -547,20 +547,6 @@ export async function saveInsight(slug: string, insight: Insight) {
   await save(db);
 }
 
-/** Number of QR scans so far (the customer page shows the next ticket number). One indexed count, no rows sent. */
-export async function countVisits(slug: string): Promise<number> {
-  if (useSupabase) {
-    const res = await fetch(`${SB_URL}/rest/v1/events?slug=eq.${encodeURIComponent(slug)}&type=eq.visit&select=id`, {
-      method: "HEAD",
-      cache: "no-store",
-      headers: { apikey: SB_KEY!, Authorization: `Bearer ${SB_KEY}`, Prefer: "count=exact" },
-    });
-    if (!res.ok) throw new Error(`Supabase ${res.status} counting visits`);
-    return Number(res.headers.get("content-range")?.split("/")[1] ?? 0);
-  }
-  return ((await load()).events[slug] ?? []).filter((e) => e.type === "visit").length;
-}
-
 export async function getStats(slug: string): Promise<Stats> {
   let events: Event[];
   if (useSupabase) {
