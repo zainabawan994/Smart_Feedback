@@ -6,6 +6,7 @@ import type { Business } from "@/lib/store";
 import { inputCls } from "@/components/forms";
 import { SENT } from "../ui";
 import { BUSINESS_TYPES, typeOf } from "@/lib/business-types";
+import { QUESTIONS_MAX, QUESTION_OPTIONS_MAX } from "@/lib/options";
 
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
 
@@ -28,6 +29,9 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
     neutral: initial.highlights.neutral.join("\n"),
     negative: initial.highlights.negative.join("\n"),
   });
+  // Owner's own questions, edited as a title + one option per line.
+  const [qs, setQs] = useState((initial.questions ?? []).map((q) => ({ title: q.title, options: q.options.join("\n") })));
+  const setQ = (i: number, patch: Partial<{ title: string; options: string }>) => setQs(qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const type = typeOf(b.kind);
@@ -39,12 +43,19 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
     const res = await fetch(`/api/business/${b.slug}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...b, menu: lines(menu), highlights: { positive: lines(hl.positive), neutral: lines(hl.neutral), negative: lines(hl.negative) } }),
+      body: JSON.stringify({
+        ...b,
+        menu: lines(menu),
+        highlights: { positive: lines(hl.positive), neutral: lines(hl.neutral), negative: lines(hl.negative) },
+        questions: qs.map((q) => ({ title: q.title, options: lines(q.options) })),
+      }),
     }).catch(() => null);
     const json = res ? await res.json().catch(() => ({})) : {};
     setSaving(false);
     if (res?.ok) {
       setB(json.business);
+      // Show what was kept (empty or one-option questions are dropped on the server).
+      setQs((json.business.questions ?? []).map((q: { title: string; options: string[] }) => ({ title: q.title, options: q.options.join("\n") })));
       setStatus({ ok: true, msg: "Saved" });
       router.refresh(); // update the name in the sidebar
     } else setStatus({ ok: false, msg: json.error ?? "Couldn't save. Check your connection." });
@@ -95,6 +106,42 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
             <textarea className={`${inputCls} font-mono text-sm`} rows={8} value={menu} onChange={(e) => setMenu(e.target.value)} placeholder={type.items.placeholder} />
           </Field>
         </div>
+      </section>
+
+      <section className={section}>
+        <h2 className="font-display text-2xl">Your own questions</h2>
+        <p className="mt-1 text-sm text-muted">
+          Ask about anything, like &quot;How was the food?&quot; with Excellent / Good / Okay / Poor. Customers tap one answer and the review mentions it. Up to {QUESTIONS_MAX} questions,{" "}
+          {QUESTION_OPTIONS_MAX} answers each.
+        </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {qs.map((q, i) => (
+            <div key={i} className="grid gap-3 rounded-xl border border-line bg-paper p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">Question {i + 1}</span>
+                <button type="button" disabled={readOnly} onClick={() => setQs(qs.filter((_, j) => j !== i))} className="text-sm text-plum underline underline-offset-4 disabled:opacity-50">
+                  Remove
+                </button>
+              </div>
+              <Field label="Question">
+                <input className={inputCls} value={q.title} maxLength={60} onChange={(e) => setQ(i, { title: e.target.value })} placeholder="How was the food?" />
+              </Field>
+              <Field label="Answers" hint={`one per line, 2 to ${QUESTION_OPTIONS_MAX}`}>
+                <textarea className={`${inputCls} text-sm`} rows={4} value={q.options} onChange={(e) => setQ(i, { options: e.target.value })} placeholder={"Excellent\nGood\nOkay\nPoor"} />
+              </Field>
+            </div>
+          ))}
+        </div>
+        {qs.length < QUESTIONS_MAX && (
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => setQs([...qs, { title: "", options: "" }])}
+            className="mt-4 rounded-full border border-ink px-4 py-2 text-sm transition hover:bg-ink hover:text-paper disabled:opacity-50"
+          >
+            + Add a question
+          </button>
+        )}
       </section>
 
       <section className={section}>

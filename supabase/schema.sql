@@ -213,3 +213,7 @@ alter table payments add constraint payments_status_check check (status in ('pen
 -- Receipt screenshot the owner attaches (JPEG data URL, shrunk in the browser). has_receipt lets lists skip the image.
 alter table payments add column if not exists receipt text check (receipt is null or length(receipt) <= 900000);
 alter table payments add column if not exists has_receipt boolean generated always as (receipt is not null) stored;
+
+-- Owner's own multiple-choice questions (e.g. Food: Excellent / Good / Okay / Poor) and the customer's answers.
+alter table businesses add column if not exists questions jsonb not null default '[]';
+alter table drafts add column if not exists answers jsonb not null default '[]';

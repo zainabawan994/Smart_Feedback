@@ -2,7 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./password.ts";
-import { TIME_ZONE, type PaymentMethod, type Plan } from "./options.ts";
+import { TIME_ZONE, type Answer, type CustomQuestion, type PaymentMethod, type Plan } from "./options.ts";
 import { typeOf } from "./business-types.ts";
 
 export type Sentiment = "positive" | "neutral" | "negative";
@@ -17,6 +17,7 @@ export type Business = {
   googleReviewUrl: string;
   menu: string[]; // products the customer can mention (they pick, we never force)
   highlights: Record<Sentiment, string[]>; // options shown per sentiment
+  questions?: CustomQuestion[]; // owner's own multiple-choice questions (see options.ts)
   defaultLang: Lang;
   ownerId?: string | null;
   // Set only by the super-admin, never by the owner's settings form.
@@ -82,6 +83,7 @@ export type Draft = {
   hasNote: boolean;
   text: string;
   source: "llm" | "template";
+  answers?: Answer[]; // replies to the owner's own questions
 };
 
 // tags on "generate" events: which search signals the draft carries (dish, occasion, photo, note) and lang:<code>
@@ -113,10 +115,10 @@ async function sb(pathAndQuery: string, init: RequestInit = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-type Row = { slug: string; name: string; city: string; kind: string; google_review_url: string; menu: string[]; highlights: Business["highlights"]; default_lang: Lang; owner_id: string | null; suspended?: boolean; plan?: Plan | null; plan_expires_at?: string | null; requested_plan?: Plan | null; plan_cancelled_at?: string | null };
-const fromRow = (r: Row): Business => ({ slug: r.slug, name: r.name, city: r.city, kind: r.kind, googleReviewUrl: r.google_review_url, menu: r.menu, highlights: r.highlights, defaultLang: r.default_lang, ownerId: r.owner_id, suspended: r.suspended ?? false, plan: r.plan ?? null, planExpiresAt: r.plan_expires_at ?? null, requestedPlan: r.requested_plan ?? null, planCancelledAt: r.plan_cancelled_at ?? null });
+type Row = { slug: string; name: string; city: string; kind: string; google_review_url: string; menu: string[]; highlights: Business["highlights"]; default_lang: Lang; owner_id: string | null; questions?: CustomQuestion[] | null; suspended?: boolean; plan?: Plan | null; plan_expires_at?: string | null; requested_plan?: Plan | null; plan_cancelled_at?: string | null };
+const fromRow = (r: Row): Business => ({ slug: r.slug, name: r.name, city: r.city, kind: r.kind, googleReviewUrl: r.google_review_url, menu: r.menu, highlights: r.highlights, defaultLang: r.default_lang, ownerId: r.owner_id, questions: r.questions ?? [], suspended: r.suspended ?? false, plan: r.plan ?? null, planExpiresAt: r.plan_expires_at ?? null, requestedPlan: r.requested_plan ?? null, planCancelledAt: r.plan_cancelled_at ?? null });
 const toRow = (b: Partial<Business>) => {
-  const r: Partial<Row> = { slug: b.slug, name: b.name, city: b.city, kind: b.kind, google_review_url: b.googleReviewUrl, menu: b.menu, highlights: b.highlights, default_lang: b.defaultLang, owner_id: b.ownerId, suspended: b.suspended, plan: b.plan, plan_expires_at: b.planExpiresAt, requested_plan: b.requestedPlan, plan_cancelled_at: b.planCancelledAt };
+  const r: Partial<Row> = { slug: b.slug, name: b.name, city: b.city, kind: b.kind, google_review_url: b.googleReviewUrl, menu: b.menu, highlights: b.highlights, default_lang: b.defaultLang, owner_id: b.ownerId, questions: b.questions, suspended: b.suspended, plan: b.plan, plan_expires_at: b.planExpiresAt, requested_plan: b.requestedPlan, plan_cancelled_at: b.planCancelledAt };
   for (const k of Object.keys(r) as (keyof Row)[]) if (r[k] === undefined) delete r[k];
   return r;
 };
@@ -504,12 +506,12 @@ export async function track(slug: string, type: EventType, sentiment?: Sentiment
 
 /* ---- drafts ---- */
 
-type DraftRow = { id: string; created_at: string; sentiment: Sentiment; lang: Lang; picks: string[]; items: string[]; occasions: string[]; has_photo: boolean; has_note: boolean; text: string; source: Draft["source"] };
+type DraftRow = { id: string; created_at: string; sentiment: Sentiment; lang: Lang; picks: string[]; items: string[]; occasions: string[]; has_photo: boolean; has_note: boolean; text: string; source: Draft["source"]; answers?: Answer[] | null };
 
 export async function saveDraft(slug: string, d: Omit<Draft, "id" | "at">) {
   const draft: Draft = { id: randomUUID(), at: new Date().toISOString(), ...d };
   if (useSupabase) {
-    const row = { id: draft.id, slug, sentiment: d.sentiment, lang: d.lang, picks: d.picks, items: d.items, occasions: d.occasions, has_photo: d.hasPhoto, has_note: d.hasNote, text: d.text, source: d.source };
+    const row = { id: draft.id, slug, sentiment: d.sentiment, lang: d.lang, picks: d.picks, items: d.items, occasions: d.occasions, has_photo: d.hasPhoto, has_note: d.hasNote, text: d.text, source: d.source, answers: d.answers ?? [] };
     await sb("drafts", { method: "POST", body: JSON.stringify(row), headers: { Prefer: "return=minimal" } }).catch(() => {});
     return;
   }
@@ -522,7 +524,7 @@ export async function saveDraft(slug: string, d: Omit<Draft, "id" | "at">) {
 export async function listDrafts(slug: string, limit = 200): Promise<Draft[]> {
   if (useSupabase) {
     const rows: DraftRow[] = await sb(`drafts?slug=eq.${encodeURIComponent(slug)}&select=*&order=created_at.desc&limit=${limit}`);
-    return rows.map((r) => ({ id: r.id, at: r.created_at, sentiment: r.sentiment, lang: r.lang, picks: r.picks, items: r.items, occasions: r.occasions, hasPhoto: r.has_photo, hasNote: r.has_note, text: r.text, source: r.source }));
+    return rows.map((r) => ({ id: r.id, at: r.created_at, sentiment: r.sentiment, lang: r.lang, picks: r.picks, items: r.items, occasions: r.occasions, hasPhoto: r.has_photo, hasNote: r.has_note, text: r.text, source: r.source, answers: r.answers ?? [] }));
   }
   return ((await load()).drafts[slug] ?? []).slice(0, limit);
 }

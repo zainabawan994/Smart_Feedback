@@ -1,6 +1,6 @@
 import { getStats, updateBusiness, type Business } from "@/lib/store";
 import { ownedBusiness } from "@/lib/auth";
-import { normalizeReviewUrl } from "@/lib/options";
+import { cleanQuestions, normalizeReviewUrl } from "@/lib/options";
 import { typeOf } from "@/lib/business-types";
 
 // Owners only. 404 (not 403) for other people's businesses so slugs can't be probed.
@@ -29,6 +29,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ slug: st
     menu: list(b.menu),
     defaultLang: ["en", "ur", "roman"].includes(b.defaultLang) ? b.defaultLang : "en",
   };
+  if (Array.isArray(b.questions)) patch.questions = cleanQuestions(b.questions);
   if (b.highlights) patch.highlights = { positive: list(b.highlights.positive) ?? [], neutral: list(b.highlights.neutral) ?? [], negative: list(b.highlights.negative) ?? [] };
   for (const k of Object.keys(patch) as (keyof Business)[]) if (patch[k] === undefined) delete patch[k];
   const saved = await updateBusiness(slug, patch);

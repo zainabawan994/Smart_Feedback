@@ -45,6 +45,7 @@ export default function Flow({ business: b }: { business: Business }) {
   const [picks, setPicks] = useState<string[]>([]);
   const [items, setItems] = useState<string[]>([]);
   const [note, setNote] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({}); // owner's own questions: title → chosen answer
   const [lang, setLang] = useState<Lang>(b.defaultLang);
   const [draft, setDraft] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
@@ -64,7 +65,7 @@ export default function Flow({ business: b }: { business: Business }) {
     setBusy(true);
     setError("");
     try {
-      const res = await post("/api/generate", { slug: b.slug, sentiment, picks, items, note, lang });
+      const res = await post("/api/generate", { slug: b.slug, sentiment, picks, items, note, lang, answers });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong");
       setDraft(json.text);
@@ -85,7 +86,9 @@ export default function Flow({ business: b }: { business: Business }) {
   }
 
   const rtl = lang === "ur";
-  const ready = Boolean(sentiment) && (picks.length > 0 || note.trim().length > 0);
+  const questions = b.questions ?? [];
+  const ready = Boolean(sentiment) && (picks.length > 0 || Object.keys(answers).length > 0 || note.trim().length > 0);
+  let n = 1; // question numbers follow what is actually shown
   const chip = (on: boolean) =>
     `rounded-full border px-4 py-2.5 text-base transition disabled:opacity-35 ${on ? "border-ink bg-ink text-paper" : "border-line bg-card hover:border-ink"}`;
 
@@ -143,7 +146,32 @@ export default function Flow({ business: b }: { business: Business }) {
       {sentiment && (
         <>
           {/* 2 · What stood out */}
-          <Question n={2} title="What stood out?" hint={`pick up to 3 · ${picks.length}/3`}>
+          {questions.map((q) => (
+            <Question key={q.title} n={++n} title={q.title}>
+              <div className="flex flex-wrap gap-2">
+                {q.options.map((o) => {
+                  const on = answers[q.title] === o;
+                  return (
+                    <button
+                      key={o}
+                      aria-pressed={on}
+                      onClick={() => {
+                        const next = { ...answers };
+                        if (on) delete next[q.title]; // tap again to clear
+                        else next[q.title] = o;
+                        setAnswers(next);
+                      }}
+                      className={chip(on)}
+                    >
+                      {o}
+                    </button>
+                  );
+                })}
+              </div>
+            </Question>
+          ))}
+
+          <Question n={++n} title="What stood out?" hint={`pick up to 3 · ${picks.length}/3`}>
             <div className="flex flex-wrap gap-2">
               {b.highlights[sentiment].map((h) => {
                 const on = picks.includes(h);
@@ -158,7 +186,7 @@ export default function Flow({ business: b }: { business: Business }) {
 
           {/* 3 · Items (only if the owner listed some) */}
           {b.menu.length > 0 && (
-            <Question n={3} title={type.items.question} hint="optional">
+            <Question n={++n} title={type.items.question} hint="optional">
               <div className="flex flex-wrap gap-2">
                 {b.menu.map((m) => {
                   const on = items.includes(m);
@@ -173,7 +201,7 @@ export default function Flow({ business: b }: { business: Business }) {
           )}
 
           {/* 4 · Own words */}
-          <Question n={b.menu.length > 0 ? 4 : 3} title="Anything else?" hint="optional">
+          <Question n={++n} title="Anything else?" hint="optional">
             <textarea
               aria-label="Anything else"
               value={note}
@@ -194,7 +222,7 @@ export default function Flow({ business: b }: { business: Business }) {
           >
             {busy ? "Writing your review…" : draft ? "Write it again" : "Continue"}
           </button>
-          {!ready && <p className="mt-2 text-center text-sm text-muted">Pick at least one thing that stood out.</p>}
+          {!ready && <p className="mt-2 text-center text-sm text-muted">Answer at least one question above.</p>}
         </>
       )}
 

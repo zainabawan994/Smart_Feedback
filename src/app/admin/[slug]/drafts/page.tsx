@@ -57,7 +57,7 @@ export default async function DraftsPage({ params, searchParams }: { params: Pro
         <ul className="mt-6 grid gap-4 md:grid-cols-2">
           {drafts.map((d) => {
             const s = SENT.find((x) => x.key === d.sentiment)!;
-            const tags = [...d.items, ...d.occasions];
+            const tags = [...d.items, ...d.occasions, ...(d.answers ?? []).map((x) => `${x.q}: ${x.a}`)];
             return (
               <li key={d.id} className="flex flex-col rounded-2xl border border-line bg-card p-5" style={{ borderTop: `3px solid ${s.color}` }}>
                 <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">

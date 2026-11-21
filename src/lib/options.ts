@@ -77,3 +77,29 @@ export function planState(b: { plan?: Plan | null; planExpiresAt?: string | null
   if (left !== null && left <= 7) return { label: `${name} · ${left}d left`, tone: "warn" as const };
   return { label: name, tone: "ok" as const };
 }
+
+/** Owner's own multiple-choice questions on the customer page (e.g. "Food" → Excellent / Good / Okay / Poor). */
+export type CustomQuestion = { title: string; options: string[] };
+export type Answer = { q: string; a: string };
+export const QUESTIONS_MAX = 4;
+export const QUESTION_OPTIONS_MAX = 6;
+
+/** Keeps only well-formed questions: a title and at least 2 distinct options, trimmed to the limits. */
+export function cleanQuestions(v: unknown): CustomQuestion[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((q) => ({
+      title: String(q?.title ?? "").replace(/\s+/g, " ").trim().slice(0, 60),
+      options: [...new Set((Array.isArray(q?.options) ? q.options : []).map((o: unknown) => String(o).replace(/\s+/g, " ").trim().slice(0, 40)).filter(Boolean))].slice(0, QUESTION_OPTIONS_MAX) as string[],
+    }))
+    .filter((q) => q.title && q.options.length >= 2)
+    .filter((q, i, all) => all.findIndex((x) => x.title.toLowerCase() === q.title.toLowerCase()) === i)
+    .slice(0, QUESTIONS_MAX);
+}
+
+/** Customer answers that match the business's questions exactly; anything else never reaches the AI prompt. */
+export function validAnswers(questions: CustomQuestion[], raw: unknown): Answer[] {
+  const given = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return questions.flatMap((q) => (typeof given[q.title] === "string" && q.options.includes(given[q.title] as string) ? [{ q: q.title, a: given[q.title] as string }] : []));
+}
+
