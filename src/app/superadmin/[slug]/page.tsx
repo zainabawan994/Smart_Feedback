@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/auth";
-import { superAdminUpdateBusiness } from "@/lib/actions";
+import { decidePaymentAction, superAdminUpdateBusiness } from "@/lib/actions";
 import { getStats, listPayments, listPlatformBusinesses } from "@/lib/store";
 import { ActionForm, inputCls } from "@/components/forms";
-import { PageHeader, card, eyebrow, when } from "../../admin/[slug]/ui";
+import { PageHeader, card, day, eyebrow, when } from "../../admin/[slug]/ui";
 import { PAYMENT_METHODS, PLANS, TIME_ZONE, planLabel, planState, rupees } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "../ui";
 
@@ -45,6 +45,11 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
         <section className={card}>
           <h2 className="font-display text-2xl">Controls</h2>
           <p className="mb-5 mt-1 text-sm text-muted">Suspending switches off the customer page and pauses the owner&apos;s desk. Nothing is deleted.</p>
+          {b.planCancelledAt && b.planExpiresAt && (
+            <p className="mb-5 rounded-lg border border-mustard px-3 py-2 text-sm">
+              Owner cancelled the plan on {day(b.planCancelledAt)}. It runs until {day(b.planExpiresAt)} and won&apos;t renew. To end it now, set Plan to &quot;No plan&quot;.
+            </p>
+          )}
           {b.requestedPlan && (
             <p className="mb-5 rounded-lg border border-tomato px-3 py-2 text-sm">
               Owner requested the <span className="font-medium">{planLabel(b.requestedPlan)}</span> plan. Choose it below and save to switch it on.
@@ -120,25 +125,42 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
         ) : (
           <ul className="mt-3 divide-y divide-line text-sm">
             {payments.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
+              <li key={p.id} className="grid gap-2 py-3 md:grid-cols-[1fr_auto] md:items-center">
                 <span>
                   {planLabel(p.plan)} · {rupees(p.amountPkr)} · {PAYMENT_METHODS.find((m) => m.key === p.method)?.label} · TID <span className="font-mono">{p.reference}</span> · from {p.payer}
-                  {p.note && <span className="block text-xs text-plum">{p.note}</span>}
+                  <span className="block text-xs text-muted">
+                    <span className={p.status === "approved" ? "text-leaf" : p.status === "pending" ? "text-tomato" : "text-plum"}>{p.status}</span> · {when(p.createdAt)}
+                    {p.note && <> · {p.note}</>}
+                  </span>
                 </span>
-                <span className="flex items-center gap-3">
-                  <span className={p.status === "approved" ? "text-leaf" : p.status === "rejected" ? "text-plum" : "text-tomato"}>{p.status}</span>
-                  <span className="font-mono text-xs text-muted">{when(p.createdAt)}</span>
-                </span>
+                {(p.status === "pending" || p.status === "approved") && (
+                  <form action={decidePaymentAction} className="flex flex-wrap items-center gap-2">
+                    <input type="hidden" name="id" value={p.id} />
+                    <input name="note" placeholder={p.status === "pending" ? "Reason if rejecting" : "Refund note"} maxLength={200} className="w-40 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm" aria-label="Note" />
+                    {p.status === "pending" ? (
+                      <>
+                        <button name="decision" value="reject" className="rounded-full border border-plum px-3 py-1.5 text-sm text-plum transition hover:bg-plum hover:text-paper">
+                          Reject
+                        </button>
+                        <button name="decision" value="approve" className="rounded-full bg-leaf px-4 py-1.5 text-sm text-paper transition hover:opacity-90">
+                          Approve
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <label className="flex items-center gap-1.5 text-xs">
+                          <input type="checkbox" name="endPlan" /> end plan now
+                        </label>
+                        <button name="decision" value="refund" className="rounded-full border border-ink px-3 py-1.5 text-sm transition hover:bg-ink hover:text-paper">
+                          Mark refunded
+                        </button>
+                      </>
+                    )}
+                  </form>
+                )}
               </li>
             ))}
           </ul>
-        )}
-        {payments.some((p) => p.status === "pending") && (
-          <p className="mt-3 text-sm">
-            <Link href="/superadmin" className="underline underline-offset-4">
-              Approve or reject it on the main page →
-            </Link>
-          </p>
         )}
       </section>
     </main>

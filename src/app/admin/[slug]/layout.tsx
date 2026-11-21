@@ -2,6 +2,7 @@ import Link from "next/link";
 import { isSuperAdmin, requireOwnerPage } from "@/lib/auth";
 import { listBusinesses } from "@/lib/store";
 import { logout } from "@/lib/actions";
+import { planState } from "@/lib/options";
 import Nav from "./Nav";
 
 export default async function AdminLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
@@ -71,6 +72,11 @@ export default async function AdminLayout({ children, params }: { children: Reac
               Manage this business →
             </Link>
           </div>
+        )}
+        {!readOnly && !business.suspended && business.plan && (planState(business).tone === "warn" || planState(business).tone === "bad") && (
+          <Link href={`/admin/${slug}/billing`} className="block border-b border-mustard bg-card px-4 py-2.5 text-sm hover:underline sm:px-8">
+            <span className="font-medium">Plan: {planState(business).label}.</span> {business.planCancelledAt ? "It won't renew." : "Renew it to keep your desk running."} →
+          </Link>
         )}
         {business.suspended && !readOnly ? (
           <div className="mx-auto max-w-xl px-4 py-16 text-center">

@@ -62,12 +62,18 @@ export function planEnd(currentExpiry: string | null | undefined, months: number
 }
 
 /** Plan status the way the super-admin needs to read it at a glance. */
-export function planState(b: { plan?: Plan | null; planExpiresAt?: string | null; suspended?: boolean }, now = Date.now()) {
+/** Whole days from now until `iso` (negative once it has passed). */
+export const daysUntil = (iso: string, now = Date.now()) => Math.ceil((+new Date(iso) - now) / 86_400_000);
+/** True while `iso` is still ahead (a plan ending this very minute is already over). */
+export const isFuture = (iso: string | null | undefined, now = Date.now()) => Boolean(iso && +new Date(iso) > now);
+
+export function planState(b: { plan?: Plan | null; planExpiresAt?: string | null; suspended?: boolean; planCancelledAt?: string | null }, now = Date.now()) {
   if (b.suspended) return { label: "Suspended", tone: "bad" as const };
   if (!b.plan) return { label: "No plan", tone: "muted" as const };
   const name = PLANS.find((p) => p.key === b.plan)?.label ?? b.plan;
-  const left = b.planExpiresAt ? Math.ceil((+new Date(b.planExpiresAt) - now) / 86_400_000) : null;
-  if (left !== null && left < 0) return { label: `${name} · expired`, tone: "bad" as const };
+  const left = b.planExpiresAt ? daysUntil(b.planExpiresAt, now) : null;
+  if (b.planExpiresAt && !isFuture(b.planExpiresAt, now)) return { label: `${name} · expired`, tone: "bad" as const };
+  if (b.planCancelledAt) return { label: `${name} · cancelled${left !== null ? `, ends in ${left}d` : ""}`, tone: "warn" as const };
   if (left !== null && left <= 7) return { label: `${name} · ${left}d left`, tone: "warn" as const };
   return { label: name, tone: "ok" as const };
 }

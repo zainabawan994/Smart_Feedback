@@ -23,6 +23,7 @@ export type Business = {
   plan?: Plan | null;
   planExpiresAt?: string | null; // ISO time
   requestedPlan?: Plan | null; // plan the owner picked on the pricing page, waiting for the super-admin to switch on
+  planCancelledAt?: string | null; // owner cancelled: the plan runs to its end date and is not renewed
 };
 
 /** A manual payment (bank / Easypaisa / JazzCash) the owner reported; the super-admin approves or rejects it. */
@@ -34,8 +35,8 @@ export type Payment = {
   method: PaymentMethod;
   reference: string; // transaction ID from the receipt
   payer: string; // sender name or number, to find it in the statement
-  status: "pending" | "approved" | "rejected";
-  note: string | null; // reason when rejected
+  status: "pending" | "approved" | "rejected" | "cancelled" | "refunded"; // cancelled = owner withdrew it before approval
+  note: string | null; // reason when rejected or refunded
   createdAt: string;
   decidedAt: string | null;
 };
@@ -110,10 +111,10 @@ async function sb(pathAndQuery: string, init: RequestInit = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-type Row = { slug: string; name: string; city: string; kind: string; google_review_url: string; menu: string[]; highlights: Business["highlights"]; default_lang: Lang; owner_id: string | null; suspended?: boolean; plan?: Plan | null; plan_expires_at?: string | null; requested_plan?: Plan | null };
-const fromRow = (r: Row): Business => ({ slug: r.slug, name: r.name, city: r.city, kind: r.kind, googleReviewUrl: r.google_review_url, menu: r.menu, highlights: r.highlights, defaultLang: r.default_lang, ownerId: r.owner_id, suspended: r.suspended ?? false, plan: r.plan ?? null, planExpiresAt: r.plan_expires_at ?? null, requestedPlan: r.requested_plan ?? null });
+type Row = { slug: string; name: string; city: string; kind: string; google_review_url: string; menu: string[]; highlights: Business["highlights"]; default_lang: Lang; owner_id: string | null; suspended?: boolean; plan?: Plan | null; plan_expires_at?: string | null; requested_plan?: Plan | null; plan_cancelled_at?: string | null };
+const fromRow = (r: Row): Business => ({ slug: r.slug, name: r.name, city: r.city, kind: r.kind, googleReviewUrl: r.google_review_url, menu: r.menu, highlights: r.highlights, defaultLang: r.default_lang, ownerId: r.owner_id, suspended: r.suspended ?? false, plan: r.plan ?? null, planExpiresAt: r.plan_expires_at ?? null, requestedPlan: r.requested_plan ?? null, planCancelledAt: r.plan_cancelled_at ?? null });
 const toRow = (b: Partial<Business>) => {
-  const r: Partial<Row> = { slug: b.slug, name: b.name, city: b.city, kind: b.kind, google_review_url: b.googleReviewUrl, menu: b.menu, highlights: b.highlights, default_lang: b.defaultLang, owner_id: b.ownerId, suspended: b.suspended, plan: b.plan, plan_expires_at: b.planExpiresAt, requested_plan: b.requestedPlan };
+  const r: Partial<Row> = { slug: b.slug, name: b.name, city: b.city, kind: b.kind, google_review_url: b.googleReviewUrl, menu: b.menu, highlights: b.highlights, default_lang: b.defaultLang, owner_id: b.ownerId, suspended: b.suspended, plan: b.plan, plan_expires_at: b.planExpiresAt, requested_plan: b.requestedPlan, plan_cancelled_at: b.planCancelledAt };
   for (const k of Object.keys(r) as (keyof Row)[]) if (r[k] === undefined) delete r[k];
   return r;
 };
@@ -367,18 +368,26 @@ export async function listPayments(filter: { slug?: string; status?: Payment["st
   return (await load()).payments.filter((p) => (!filter.slug || p.slug === filter.slug) && (!filter.status || p.status === filter.status)).slice(0, limit);
 }
 
-/** Moves a pending payment to approved/rejected. Returns it, or null if it was already decided (no double approval). */
-export async function decidePayment(id: string, status: "approved" | "rejected", note: string | null): Promise<Payment | null> {
+export async function getPayment(id: string): Promise<Payment | null> {
+  if (useSupabase) {
+    const rows: PaymentRow[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&select=*`);
+    return rows[0] ? paymentFromRow(rows[0]) : null;
+  }
+  return (await load()).payments.find((p) => p.id === id) ?? null;
+}
+
+/** Moves a payment from one status to another. Returns it, or null if it wasn't in `from` any more
+ *  (compare-and-set: two clicks can't both approve, a cancelled payment can't be approved). */
+export async function setPaymentStatus(id: string, from: Payment["status"], to: Payment["status"], note: string | null): Promise<Payment | null> {
   const decidedAt = new Date().toISOString();
   if (useSupabase) {
-    // status=eq.pending in the filter makes this a compare-and-set: two clicks can't both approve.
-    const rows: PaymentRow[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&status=eq.pending`, { method: "PATCH", body: JSON.stringify({ status, note, decided_at: decidedAt }) });
+    const rows: PaymentRow[] = await sb(`payments?id=eq.${encodeURIComponent(id)}&status=eq.${from}`, { method: "PATCH", body: JSON.stringify({ status: to, note, decided_at: decidedAt }) });
     return rows[0] ? paymentFromRow(rows[0]) : null;
   }
   const db = await load();
-  const p = db.payments.find((x) => x.id === id && x.status === "pending");
+  const p = db.payments.find((x) => x.id === id && x.status === from);
   if (!p) return null;
-  Object.assign(p, { status, note, decidedAt });
+  Object.assign(p, { status: to, note, decidedAt });
   await save(db);
   return p;
 }

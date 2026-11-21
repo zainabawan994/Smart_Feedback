@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
-import { createBusiness, createPayment, createUser, decidePayment, getBusiness, getUserByEmail, updateBusiness, updateUser } from "./store";
+import { createBusiness, createPayment, createUser, getBusiness, getPayment, getUserByEmail, setPaymentStatus, updateBusiness, updateUser } from "./store";
 import { paymentAccounts } from "./billing.ts";
 import { hashPassword, verifyPassword } from "./password.ts";
 import { PLANS, asPlan, normalizeReviewUrl, planEnd, planInfo, planLabel, rupees, type Plan } from "./options.ts";
@@ -227,28 +227,64 @@ export async function submitPayment(_: FormState, f: FormData): Promise<FormStat
   const payment = await createPayment({ slug: business.slug, plan, amountPkr: planInfo(plan).pkr, method, reference, payer });
   if (!payment) return { error: "That transaction ID was already submitted." };
   await updateBusiness(business.slug, { requestedPlan: plan });
-  revalidatePath(`/admin/${business.slug}/account`);
+  revalidatePath(`/admin/${business.slug}/billing`);
   return { info: `Thanks! We received your ${planLabel(plan)} payment of ${rupees(planInfo(plan).pkr)}. Your plan switches on as soon as we confirm it, usually within a day.` };
 }
 
-/** Super-admin: approve (switch the plan on / extend it) or reject a reported payment. */
+/** The owner's own business, for billing actions. */
+async function ownBusinessFromForm(f: FormData) {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+  const business = await getBusiness(str(f, "slug", 40));
+  return business && business.ownerId === user.id ? business : null;
+}
+
+/** Owner withdraws a payment report before it is approved (wrong amount, wrong TID...). */
+export async function cancelPayment(f: FormData) {
+  const business = await ownBusinessFromForm(f);
+  const payment = business && (await getPayment(str(f, "id", 60)));
+  if (!business || !payment || payment.slug !== business.slug) return;
+  if (await setPaymentStatus(payment.id, "pending", "cancelled", "Cancelled by the owner.")) await updateBusiness(business.slug, { requestedPlan: null });
+  revalidatePath(`/admin/${business.slug}/billing`);
+}
+
+/** Owner cancels the plan: it keeps running to its end date and is not renewed. Undo puts it back. */
+export async function cancelPlan(f: FormData) {
+  const business = await ownBusinessFromForm(f);
+  if (!business?.plan) return;
+  await updateBusiness(business.slug, { planCancelledAt: f.get("undo") ? null : new Date().toISOString() });
+  revalidatePath(`/admin/${business.slug}/billing`);
+}
+
+/** Super-admin: approve / reject a pending payment, or mark an approved one refunded. */
 export async function decidePaymentAction(f: FormData) {
   const user = await currentUser();
   if (!isSuperAdmin(user)) return;
   const id = str(f, "id", 60);
-  const approve = f.get("decision") === "approve";
-  const note = approve ? null : str(f, "note", 200) || "We couldn't find this payment. Check the transaction ID and submit again.";
-  const payment = await decidePayment(id, approve ? "approved" : "rejected", note);
-  if (payment && approve) {
-    const business = await getBusiness(payment.slug);
-    if (business) {
+  const decision = String(f.get("decision"));
+  const typed = str(f, "note", 200);
+  let payment = null;
+  if (decision === "approve") {
+    payment = await setPaymentStatus(id, "pending", "approved", null);
+    const business = payment && (await getBusiness(payment.slug));
+    if (payment && business) {
       // Renewing the same plan extends from the current end date; anything else starts today.
       const keep = business.plan === payment.plan ? business.planExpiresAt : null;
-      await updateBusiness(payment.slug, { plan: payment.plan, planExpiresAt: planEnd(keep, planInfo(payment.plan).months), requestedPlan: null, suspended: false });
+      await updateBusiness(payment.slug, { plan: payment.plan, planExpiresAt: planEnd(keep, planInfo(payment.plan).months), requestedPlan: null, planCancelledAt: null, suspended: false });
     }
+  } else if (decision === "reject") {
+    payment = await setPaymentStatus(id, "pending", "rejected", typed || "We couldn't find this payment. Check the transaction ID and submit again.");
+    if (payment) await updateBusiness(payment.slug, { requestedPlan: null });
+  } else if (decision === "refund") {
+    // Money goes back outside the app (bank / wallet); this records it and, if asked, ends the plan now.
+    payment = await setPaymentStatus(id, "approved", "refunded", typed || "Refunded.");
+    if (payment && f.get("endPlan")) await updateBusiness(payment.slug, { planExpiresAt: new Date().toISOString() });
   }
   revalidatePath("/superadmin");
-  if (payment) revalidatePath(`/superadmin/${payment.slug}`);
+  if (payment) {
+    revalidatePath(`/superadmin/${payment.slug}`);
+    revalidatePath(`/admin/${payment.slug}/billing`);
+  }
 }
 
 /* ---------------- super-admin ---------------- */
@@ -275,7 +311,7 @@ export async function superAdminUpdateBusiness(_: FormState, f: FormData): Promi
     }
   }
   // Switching a plan on answers the owner's request, so clear it.
-  await updateBusiness(slug, { suspended: f.get("suspended") === "on", plan: (plan?.key ?? null) as Plan | null, planExpiresAt, ...(plan ? { requestedPlan: null } : {}) });
+  await updateBusiness(slug, { suspended: f.get("suspended") === "on", plan: (plan?.key ?? null) as Plan | null, planExpiresAt, ...(plan ? { requestedPlan: null } : { planCancelledAt: null }) });
   return { info: "Saved." };
 }
 

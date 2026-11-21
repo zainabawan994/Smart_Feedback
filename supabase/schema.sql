@@ -163,17 +163,19 @@ grant execute on function hit_rate_limit(text, int, int) to service_role;
 alter table businesses add column if not exists suspended boolean not null default false;
 alter table businesses add column if not exists plan text check (plan in ('monthly','6months','yearly'));
 alter table businesses add column if not exists plan_expires_at timestamptz;
+-- Owner cancelled the plan: it runs to plan_expires_at and is not renewed.
+alter table businesses add column if not exists plan_cancelled_at timestamptz;
 alter table businesses add column if not exists requested_plan text check (requested_plan in ('monthly','6months','yearly')); -- picked on the pricing page
 
 -- Super-admin list: every business with its owner's email and activity counts, in one call.
 drop function if exists platform_businesses(); -- its columns changed; Postgres can't replace a function's return type in place
 create function platform_businesses() returns table (
   slug text, name text, city text, kind text, google_review_url text, menu text[], highlights jsonb, default_lang text,
-  owner_id uuid, suspended boolean, plan text, plan_expires_at timestamptz, requested_plan text, owner_email text, created_at timestamptz,
+  owner_id uuid, suspended boolean, plan text, plan_expires_at timestamptz, requested_plan text, plan_cancelled_at timestamptz, owner_email text, created_at timestamptz,
   visits bigint, drafts bigint, google bigint, last_activity timestamptz
 ) language sql stable as $$
   select b.slug, b.name, b.city, b.kind, b.google_review_url, b.menu, b.highlights, b.default_lang,
-         b.owner_id, b.suspended, b.plan, b.plan_expires_at, b.requested_plan, u.email, b.created_at,
+         b.owner_id, b.suspended, b.plan, b.plan_expires_at, b.requested_plan, b.plan_cancelled_at, u.email, b.created_at,
          (select count(*) from events e where e.slug = b.slug and e.type = 'visit'),
          (select count(*) from drafts d where d.slug = b.slug),
          (select count(*) from events e where e.slug = b.slug and e.type = 'google'),
@@ -193,7 +195,7 @@ create table if not exists payments (
   method     text not null check (method in ('bank','easypaisa','jazzcash')),
   reference  text not null,
   payer      text not null,
-  status     text not null default 'pending' check (status in ('pending','approved','rejected')),
+  status     text not null default 'pending' check (status in ('pending','approved','rejected','cancelled','refunded')),
   note       text,
   created_at timestamptz not null default now(),
   decided_at timestamptz,
@@ -203,3 +205,7 @@ create index if not exists payments_status_time on payments (status, created_at 
 create index if not exists payments_slug_time on payments (slug, created_at desc);
 alter table payments enable row level security;
 grant select, insert, update, delete on payments to service_role;
+
+-- Owner can withdraw a pending payment; super-admin can mark an approved one refunded.
+alter table payments drop constraint if exists payments_status_check;
+alter table payments add constraint payments_status_check check (status in ('pending','approved','rejected','cancelled','refunded'));

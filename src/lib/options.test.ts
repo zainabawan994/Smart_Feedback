@@ -31,3 +31,19 @@ console.log("options.test plan state: ok");
   assert.equal(rupees(17000), "Rs 17,000");
   console.log("options.test plan end: ok");
 }
+
+{
+  const { planState } = await import("./options.ts");
+  const now = Date.parse("2026-11-21T12:00:00Z");
+  assert.deepEqual(planState({ plan: "yearly", planExpiresAt: "2027-01-20T12:00:00Z", planCancelledAt: "2026-11-20T00:00:00Z" }, now), { label: "Yearly · cancelled, ends in 60d", tone: "warn" });
+  assert.equal(planState({ plan: "yearly", planExpiresAt: "2026-11-01T00:00:00Z", planCancelledAt: "2026-10-01T00:00:00Z" }, now).label, "Yearly · expired");
+  console.log("options.test cancelled plan: ok");
+}
+
+{
+  const { planState } = await import("./options.ts");
+  const now = Date.parse("2026-11-21T12:00:00Z");
+  // ended a second ago (e.g. "end plan now"): expired, not "0d left"
+  assert.equal(planState({ plan: "6months", planExpiresAt: "2026-11-21T11:59:59Z", planCancelledAt: "2026-11-21T10:00:00Z" }, now).label, "6 Months · expired");
+  console.log("options.test just ended: ok");
+}
