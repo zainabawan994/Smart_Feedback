@@ -133,3 +133,28 @@ $$;
 -- Only the server key may call it (RLS already hides rows from everyone else).
 revoke execute on function business_stats(text) from public, anon, authenticated;
 grant execute on function business_stats(text) to service_role;
+
+-- Rate limits for public endpoints (AI drafts, events, station, sign-up, login, forgot password).
+-- One fixed-window counter per key; hit_rate_limit counts a hit atomically and says if it is still allowed.
+create table if not exists rate_limits (
+  key      text primary key,
+  n        integer not null,
+  reset_at timestamptz not null
+);
+alter table rate_limits enable row level security;
+grant select, insert, update, delete on rate_limits to service_role;
+
+create or replace function hit_rate_limit(p_key text, p_max int, p_window_seconds int) returns boolean language plpgsql volatile as $$
+declare cur int;
+begin
+  insert into rate_limits as r (key, n, reset_at) values (p_key, 1, now() + make_interval(secs => p_window_seconds))
+  on conflict (key) do update set
+    n        = case when r.reset_at < now() then 1 else r.n + 1 end,
+    reset_at = case when r.reset_at < now() then now() + make_interval(secs => p_window_seconds) else r.reset_at end
+  returning n into cur;
+  if random() < 0.01 then delete from rate_limits where reset_at < now() - interval '1 day'; end if; -- keep the table small
+  return cur <= p_max;
+end
+$$;
+revoke execute on function hit_rate_limit(text, int, int) from public, anon, authenticated;
+grant execute on function hit_rate_limit(text, int, int) to service_role;

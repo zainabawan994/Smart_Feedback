@@ -46,3 +46,11 @@ assert.equal(taps.counts.tap, 2);
 assert.deepEqual(taps.station, { positive: 1, neutral: 0, negative: 1 });
 assert.equal(taps.sentiment.positive, 1); // station taps don't mix into draft feelings
 console.log("store.test station: ok");
+
+// Local (JSON mode) rate limiter: 3 per window, then blocked, separate keys stay independent.
+const { rateLimit } = await import("./store.ts");
+const hits = [];
+for (let i = 0; i < 4; i++) hits.push(await rateLimit("test:a", 3, 60));
+assert.deepEqual(hits, [true, true, true, false]);
+assert.equal(await rateLimit("test:b", 3, 60), true);
+console.log("store.test rate limit: ok");

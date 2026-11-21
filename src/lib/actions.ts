@@ -1,12 +1,13 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { clearLoginFailures, currentUser, endSession, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
 import { createBusiness, createUser, getUserByEmail, updateUser } from "./store";
 import { hashPassword, verifyPassword } from "./password.ts";
 import { normalizeReviewUrl } from "./options.ts";
+import { TOO_MANY, allow, clientIp } from "./guard.ts";
 
 export type FormState = { error?: string; info?: string; sentAt?: number } | undefined;
 
@@ -32,6 +33,9 @@ function placeFields(f: FormData) {
   return { place };
 }
 
+/** Per-network cap for forms that create accounts, send email or check passwords. */
+const ipAllowed = async (name: string, max: number, windowSec: number) => allow(name, clientIp(await headers()), max, windowSec);
+
 /** Send a code, but never let an email outage crash the page. */
 async function trySend(email: string, purpose: "verify" | "reset") {
   try {
@@ -45,6 +49,7 @@ async function trySend(email: string, purpose: "verify" | "reset") {
 /* ---------------- sign up / log in / log out ---------------- */
 
 export async function signup(_: FormState, f: FormData): Promise<FormState> {
+  if (!(await ipAllowed("signup-ip", 5, 3600))) return { error: TOO_MANY };
   const email = str(f, "email").toLowerCase();
   if (!EMAIL.test(email)) return { error: "Enter a valid email." };
   const pw = newPassword(f);
@@ -61,6 +66,7 @@ export async function signup(_: FormState, f: FormData): Promise<FormState> {
 
 export async function login(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
+  if (!(await ipAllowed("login-ip", 30, 900))) return { error: TOO_MANY }; // many emails from one place = credential stuffing
   if (await loginBlocked(email)) return { error: "Too many tries. Wait 15 minutes, or reset your password." };
   const user = await getUserByEmail(email);
   // Same message either way so the form doesn't reveal which emails have accounts.
@@ -106,6 +112,7 @@ export async function resendVerification(): Promise<FormState> {
 /* ---------------- forgot / reset password ---------------- */
 
 export async function forgotPassword(_: FormState, f: FormData): Promise<FormState> {
+  if (!(await ipAllowed("forgot-ip", 5, 900))) return { error: TOO_MANY };
   const email = str(f, "email").toLowerCase();
   if (!EMAIL.test(email)) return { error: "Enter a valid email." };
   // Only send if the account exists, but behave the same either way (no account probing).
@@ -149,6 +156,7 @@ export async function resetPassword(_: FormState, f: FormData): Promise<FormStat
 export async function changePassword(_: FormState, f: FormData): Promise<FormState> {
   const user = await currentUser();
   if (!user) redirect("/login");
+  if (!(await allow("password-change", user.id, 10, 3600))) return { error: TOO_MANY }; // stolen session can't brute-force the current password
   if (!verifyPassword(String(f.get("current") ?? ""), user.passwordHash)) return { error: "Your current password is wrong." };
   const pw = newPassword(f);
   if ("error" in pw) return pw;
@@ -163,6 +171,7 @@ const accountPage = (f: FormData) => safeNext(`/admin/${str(f, "slug", 40)}/acco
 export async function startEmailChange(_: FormState, f: FormData): Promise<FormState> {
   const user = await currentUser();
   if (!user) redirect("/login");
+  if (!(await allow("email-change", user.id, 5, 3600))) return { error: TOO_MANY };
   if (!verifyPassword(String(f.get("current") ?? ""), user.passwordHash)) return { error: "Your current password is wrong." };
   const email = str(f, "email").toLowerCase();
   if (!EMAIL.test(email)) return { error: "Enter a valid email." };

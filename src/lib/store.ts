@@ -283,6 +283,29 @@ export async function putLoginAttempts(email: string, a: LoginAttempts | null) {
   await save(db);
 }
 
+/* ---- rate limits (abuse protection for public endpoints) ---- */
+
+// shortcut: JSON mode keeps counters in this process's memory; fine for local development only.
+const localHits = new Map<string, { n: number; reset: number }>();
+
+/** Counts one hit for `key`; true while it is within `max` hits per `windowSec`. */
+export async function rateLimit(key: string, max: number, windowSec: number): Promise<boolean> {
+  if (useSupabase) {
+    try {
+      return await sb("rpc/hit_rate_limit", { method: "POST", body: JSON.stringify({ p_key: key, p_max: max, p_window_seconds: windowSec }) });
+    } catch (e) {
+      if (!String(e).includes("PGRST202")) throw e;
+      console.warn("[limits] run supabase/schema.sql to add hit_rate_limit; requests are not rate limited yet");
+      return true;
+    }
+  }
+  const now = Date.now();
+  const cur = localHits.get(key);
+  const next = !cur || cur.reset < now ? { n: 1, reset: now + windowSec * 1000 } : { n: cur.n + 1, reset: cur.reset };
+  localHits.set(key, next);
+  return next.n <= max;
+}
+
 /* ---- businesses ---- */
 
 export async function listBusinesses(ownerId: string): Promise<Business[]> {

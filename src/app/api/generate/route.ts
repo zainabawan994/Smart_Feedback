@@ -1,14 +1,19 @@
 import { getBusiness, saveDraft, track, type Lang, type Sentiment } from "@/lib/store";
 import { draftReview } from "@/lib/review";
 import { LANGS, NOTE_MAX, OCCASIONS, PHOTO_MAX_CHARS } from "@/lib/options";
+import { allow, clientIp, tooMany } from "@/lib/guard";
 
 const SENTIMENTS: Sentiment[] = ["positive", "neutral", "negative"];
 const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 export async function POST(req: Request) {
+  if (Number(req.headers.get("content-length") ?? 0) > PHOTO_MAX_CHARS + 20_000) return Response.json({ error: "Request too large" }, { status: 413 });
+  // Each draft is a paid/quota'd AI call: cap per visitor and per business so a script can't burn the quota or flood the stats.
+  if (!(await allow("generate-ip", clientIp(req.headers), 15, 600))) return tooMany();
   const body = await req.json().catch(() => null);
   const b = body && (await getBusiness(String(body.slug)));
   if (!b) return Response.json({ error: "Unknown business" }, { status: 404 });
+  if (!(await allow("generate-biz", b.slug, 300, 3600))) return tooMany();
 
   const sentiment = SENTIMENTS.includes(body.sentiment) ? (body.sentiment as Sentiment) : null;
   if (!sentiment) return Response.json({ error: "Pick how your visit was" }, { status: 400 });
