@@ -140,7 +140,9 @@ export async function chat(baseUrl: string, apiKey: string | undefined, model: s
     headers: { "Content-Type": "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
     // Keep small: Groq free tier rejects any request asking for more than 1000 output tokens/min (a review is ~150).
     body: JSON.stringify({ model, messages, temperature: 0.3, max_tokens: maxTokens }),
-    signal: AbortSignal.timeout(90_000), // local CPU models can be slow on first load
+    // Hosted APIs answer in about a second; give up fast so the customer gets the template instead of waiting.
+    // Local CPU models (Ollama) can take a minute on first load.
+    signal: AbortSignal.timeout(/localhost|127\.0\.0\.1/.test(baseUrl) ? 90_000 : 20_000),
   });
   if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const json = await res.json();
@@ -195,6 +197,20 @@ export function templateDraft(b: Business, d: DraftInput) {
   return `${fill(OPENERS[d.sentiment][d.lang])} ${when}${had}${points}${note}${CLOSERS[d.sentiment][d.lang]}`.replace(/\s+/g, " ").trim();
 }
 
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const mentions = (text: string, name: string) => new RegExp(`(^|[^\\p{L}])${esc(name)}([^\\p{L}]|$)`, "iu").test(text);
+
+/** Menu dishes the text names that the customer did not choose (the model made them up). */
+export function inventedDishes(text: string, menu: string[], chosen: string[]) {
+  return menu.filter((m) => !chosen.includes(m) && mentions(text, m));
+}
+
+/** Names that must survive the rewrite: place, city and chosen dishes the draft already contains.
+ *  Latin-script reviews only; Urdu reviews spell names in Urdu letters, so they can't be matched. */
+export function lostNames(draft: string, norm: string, names: string[]) {
+  return names.filter((n) => n && mentions(draft, n) && !mentions(norm, n));
+}
+
 /** Reject a normalized version that lost content or changed tone. */
 /** True when the text is written in the script the customer asked for (Urdu script vs Latin letters). */
 export function scriptOk(text: string, lang: Lang) {
@@ -204,9 +220,10 @@ export function scriptOk(text: string, lang: Lang) {
   return lang === "ur" ? urdu > 0 && latin === 0 : urdu === 0;
 }
 
-export function acceptNormalized(draft: string, norm: string, s: Sentiment, lang: Lang = "en") {
+export function acceptNormalized(draft: string, norm: string, s: Sentiment, lang: Lang = "en", names: string[] = []) {
   if (!norm || norm.length < draft.length * 0.4 || norm.length > draft.length * 1.6) return false;
   if (!scriptOk(norm, lang)) return false;
+  if (lang !== "ur" && lostNames(draft, norm, names).length) return false;
   const praise = /\b(amazing|excellent|fantastic|perfect|best|loved|great)\b/i;
   if (s === "negative" && praise.test(norm) && !praise.test(draft)) return false;
   return true;
@@ -247,10 +264,16 @@ export async function draftReview(b: Business, d: DraftInput): Promise<DraftResu
     try {
       const out = await chat(base, key, genModel, generationPrompt(b, d, photoOther));
       if (!scriptOk(out, d.lang)) throw new Error(`draft came back in the wrong script for "${d.lang}": ${out.slice(0, 160)}`);
+      if (d.lang !== "ur") {
+        const made = inventedDishes(out, b.menu, d.items);
+        if (made.length) throw new Error(`draft named dishes the customer didn't pick (${made.join(", ")}): ${out.slice(0, 160)}`);
+        const dropped = d.items.filter((i) => !mentions(out, i));
+        if (dropped.length) throw new Error(`draft left out chosen dishes (${dropped.join(", ")}): ${out.slice(0, 160)}`);
+      }
       text = out;
       source = "llm";
     } catch (e) {
-      aiBusy ||= !/wrong script/.test((e as Error).message);
+      aiBusy ||= !/wrong script|named dishes|left out/.test((e as Error).message); // quality rejects aren't "AI busy"
       console.error("[generate] falling back to template:", (e as Error).message);
     }
   }
@@ -259,7 +282,8 @@ export async function draftReview(b: Business, d: DraftInput): Promise<DraftResu
   if (normBase && normModel) {
     try {
       const n = await chat(normBase, normKey, normModel, normalizePrompt(text, d));
-      if (acceptNormalized(text, n, d.sentiment, d.lang)) {
+      const invented = d.lang !== "ur" && inventedDishes(n, b.menu, d.items).length > 0;
+      if (!invented && acceptNormalized(text, n, d.sentiment, d.lang, [b.name, b.city, ...d.items])) {
         text = n;
         normalizedBy = "open-model";
       }

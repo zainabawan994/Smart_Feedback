@@ -1,4 +1,5 @@
 import { timingSafeEqual } from "crypto";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { hmac } from "./secret.ts";
@@ -43,21 +44,20 @@ export async function currentUser(): Promise<User | null> {
   return user?.emailVerified ? user : null;
 }
 
-/** For pages: the signed-in, verified owner of this business, or redirect. */
-export async function requireOwnerPage(slug: string): Promise<{ user: User; business: Business }> {
-  const user = await sessionUser();
+/** For pages: the signed-in, verified owner of this business, or redirect.
+ *  cache(): the admin layout and the page both call this; it runs once per request. */
+export const requireOwnerPage = cache(async (slug: string): Promise<{ user: User; business: Business }> => {
+  const [user, business] = await Promise.all([sessionUser(), getBusiness(slug)]);
   if (!user) redirect(`/login?next=/admin/${encodeURIComponent(slug)}`);
   if (!user.emailVerified) redirect("/verify");
-  const business = await getBusiness(slug);
   if (!business || business.ownerId !== user.id) redirect("/admin");
   return { user, business };
-}
+});
 
 /** For API routes: the business if the signed-in, verified user owns it, else null. */
 export async function ownedBusiness(slug: string) {
-  const user = await currentUser();
-  const business = user && (await getBusiness(slug));
-  return business && business.ownerId === user!.id ? business : null;
+  const [user, business] = await Promise.all([currentUser(), getBusiness(slug)]);
+  return user && business && business.ownerId === user.id ? business : null;
 }
 
 // 5 wrong passwords lock that email for 15 minutes. Stored in the database so every server sees it.

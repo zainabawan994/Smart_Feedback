@@ -107,10 +107,10 @@ grant usage, select on all sequences in schema public to service_role;
 alter table events drop constraint if exists events_type_check;
 alter table events add constraint events_type_check check (type in ('visit','generate','copy','google','tap'));
 
--- Owner overview numbers, counted in Postgres so the app never downloads raw events. Days are UTC.
+-- Owner overview numbers, counted in Postgres so the app never downloads raw events. Days follow Pakistan time (TIME_ZONE in src/lib/options.ts).
 create or replace function business_stats(p_slug text) returns jsonb language sql stable as $$
   with e as (select type, sentiment, tags, created_at from events where slug = p_slug),
-  days as (select d::date as day from generate_series((now() at time zone 'utc')::date - 13, (now() at time zone 'utc')::date, interval '1 day') d)
+  days as (select d::date as day from generate_series((now() at time zone 'Asia/Karachi')::date - 13, (now() at time zone 'Asia/Karachi')::date, interval '1 day') d)
   select jsonb_build_object(
     'counts', (select jsonb_build_object(
         'visit', count(*) filter (where type = 'visit'), 'generate', count(*) filter (where type = 'generate'),
@@ -123,8 +123,8 @@ create or replace function business_stats(p_slug text) returns jsonb language sq
         'positive', count(*) filter (where sentiment = 'positive'), 'neutral', count(*) filter (where sentiment = 'neutral'),
         'negative', count(*) filter (where sentiment = 'negative')) from e where type = 'tap'),
     'daily', (select jsonb_agg(jsonb_build_object('day', to_char(days.day, 'YYYY-MM-DD'),
-        'visits', (select count(*) from e where type = 'visit' and (created_at at time zone 'utc')::date = days.day),
-        'google', (select count(*) from e where type = 'google' and (created_at at time zone 'utc')::date = days.day)) order by days.day) from days),
+        'visits', (select count(*) from e where type = 'visit' and (created_at at time zone 'Asia/Karachi')::date = days.day),
+        'google', (select count(*) from e where type = 'google' and (created_at at time zone 'Asia/Karachi')::date = days.day)) order by days.day) from days),
     'recent', (select coalesce(jsonb_agg(jsonb_build_object('type', type, 'at', created_at, 'sentiment', sentiment, 'tags', tags) order by created_at desc), '[]')
         from (select * from e order by created_at desc limit 30) r),
     'signals', (select coalesce(jsonb_object_agg(t, n), '{}') from (select t, count(*) as n from e, unnest(tags) as t where type = 'generate' group by t) s)

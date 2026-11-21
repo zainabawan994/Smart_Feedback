@@ -54,3 +54,8 @@ for (let i = 0; i < 4; i++) hits.push(await rateLimit("test:a", 3, 60));
 assert.deepEqual(hits, [true, true, true, false]);
 assert.equal(await rateLimit("test:b", 3, 60), true);
 console.log("store.test rate limit: ok");
+
+// Days follow Pakistan time: 01:00 PKT on the 21st is still the 20th in UTC.
+const pk = computeStats([{ type: "visit", at: "2026-11-20T20:00:00Z" }], now);
+assert.deepEqual(pk.daily.at(-1), { day: "2026-11-21", visits: 1, google: 0 });
+console.log("store.test pakistan days: ok");

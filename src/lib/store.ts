@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { hashPassword } from "./password.ts";
+import { TIME_ZONE } from "./options.ts";
 
 export type Sentiment = "positive" | "neutral" | "negative";
 export type Lang = "en" | "ur" | "roman";
@@ -412,6 +413,20 @@ export async function saveInsight(slug: string, insight: Insight) {
   await save(db);
 }
 
+/** Number of QR scans so far (the customer page shows the next ticket number). One indexed count, no rows sent. */
+export async function countVisits(slug: string): Promise<number> {
+  if (useSupabase) {
+    const res = await fetch(`${SB_URL}/rest/v1/events?slug=eq.${encodeURIComponent(slug)}&type=eq.visit&select=id`, {
+      method: "HEAD",
+      cache: "no-store",
+      headers: { apikey: SB_KEY!, Authorization: `Bearer ${SB_KEY}`, Prefer: "count=exact" },
+    });
+    if (!res.ok) throw new Error(`Supabase ${res.status} counting visits`);
+    return Number(res.headers.get("content-range")?.split("/")[1] ?? 0);
+  }
+  return ((await load()).events[slug] ?? []).filter((e) => e.type === "visit").length;
+}
+
 export async function getStats(slug: string): Promise<Stats> {
   let events: Event[];
   if (useSupabase) {
@@ -432,15 +447,14 @@ export async function getStats(slug: string): Promise<Stats> {
   return computeStats(events);
 }
 
+const localDay = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+
 export function computeStats(events: Event[], now = new Date()): Stats {
   const counts: Stats["counts"] = { visit: 0, generate: 0, copy: 0, google: 0, tap: 0 };
   const sentiment: Stats["sentiment"] = { positive: 0, neutral: 0, negative: 0 };
   const station: Stats["station"] = { positive: 0, neutral: 0, negative: 0 };
-  const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - (13 - i));
-    return { day: d.toISOString().slice(0, 10), visits: 0, google: 0 };
-  });
+  const day = (t: Date) => localDay.format(t); // YYYY-MM-DD on the cafe's clock
+  const days = Array.from({ length: 14 }, (_, i) => ({ day: day(new Date(+now - (13 - i) * 86_400_000)), visits: 0, google: 0 }));
   const signals: Record<string, number> = {};
   const byDay = new Map(days.map((d) => [d.day, d]));
   for (const e of events) {
@@ -448,7 +462,7 @@ export function computeStats(events: Event[], now = new Date()): Stats {
     if (e.type === "generate" && e.sentiment) sentiment[e.sentiment]++;
     if (e.type === "tap" && e.sentiment) station[e.sentiment]++;
     if (e.type === "generate") for (const t of e.tags ?? []) signals[t] = (signals[t] ?? 0) + 1;
-    const d = byDay.get(e.at.slice(0, 10));
+    const d = byDay.get(day(new Date(e.at)));
     if (d && e.type === "visit") d.visits++;
     if (d && e.type === "google") d.google++;
   }

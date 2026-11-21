@@ -1,4 +1,5 @@
 import type { Sentiment } from "@/lib/store";
+import { TIME_ZONE } from "@/lib/options";
 
 export const SENT: { key: Sentiment; label: string; color: string }[] = [
   { key: "positive", label: "Loved it", color: "var(--leaf)" },
@@ -10,7 +11,7 @@ export const LANG_LABEL = { en: "English", roman: "Roman Urdu", ur: "اردو" }
 
 // Fixed zone so server-rendered times match what owners in Pakistan expect.
 export const when = (iso: string) =>
-  new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" });
+  new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE });
 
 export function PageHeader({ eyebrow, title, children }: { eyebrow: string; title: string; children?: React.ReactNode }) {
   return (

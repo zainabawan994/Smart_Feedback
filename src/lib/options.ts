@@ -1,5 +1,9 @@
 // Shared by the customer page and the API so both accept exactly the same values.
 
+// shortcut: every business is in Pakistan today; store a time zone per business if you open elsewhere.
+/** Days in charts and times in the owner desk follow the cafe's clock, not the server's (UTC on most hosts). */
+export const TIME_ZONE = "Asia/Karachi";
+
 export const LANGS = [
   { key: "en", label: "English" },
   { key: "roman", label: "Roman Urdu" },

@@ -41,3 +41,18 @@ assert.deepEqual(parsePhoto('{"menu": [], "other": []}', menu), { items: [], oth
 console.log("review.test photo: ok");
 assert.deepEqual(parsePhoto('{"menu": [], "other": ["cup of tea", "Cup of tea "]}', menu), { items: [], other: ["cup of tea"] });
 console.log("review.test photo dedupe: ok");
+
+// Accuracy guards: invented dishes and dropped names.
+{
+  const { inventedDishes, lostNames, acceptNormalized } = await import("./review.ts");
+  const menu = ["Zinger roll", "Doodh patti", "Bun kebab"];
+  assert.deepEqual(inventedDishes("Had a zinger roll and some doodh patti.", menu, ["Zinger roll"]), ["Doodh patti"]);
+  assert.deepEqual(inventedDishes("Had a Zinger roll.", menu, ["Zinger roll"]), []);
+  assert.deepEqual(inventedDishes("Bun kebabs everywhere? no, just tea", ["Bun kebab"], []), []); // whole names only
+  assert.deepEqual(lostNames("Dinner at Chai Khana in Lahore. Zinger roll was cold.", "Dinner here. It was cold.", ["Chai Khana", "Lahore", "Zinger roll"]), ["Chai Khana", "Lahore", "Zinger roll"]);
+  assert.deepEqual(lostNames("Went for dinner. Food was cold.", "Dinner, food cold.", ["Chai Khana"]), []); // never in the draft, nothing to lose
+  const draft = "Dinner at Chai Khana in Lahore. The Zinger roll came cold after a long wait.";
+  assert.equal(acceptNormalized(draft, "Had dinner at Chai Khana, Lahore. Zinger roll came cold after a long wait.", "negative", "en", ["Chai Khana", "Lahore", "Zinger roll"]), true);
+  assert.equal(acceptNormalized(draft, "Had dinner at Chai Khana, Lahore. My roll came cold after a really long wait.", "negative", "en", ["Chai Khana", "Lahore", "Zinger roll"]), false);
+  console.log("review.test accuracy guards: ok");
+}
