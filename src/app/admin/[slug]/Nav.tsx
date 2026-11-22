@@ -7,6 +7,7 @@ import { useState } from "react";
 const ITEMS = [
   { href: "", label: "Dashboard", icon: "M4 13h4v7H4zM10 4h4v16h-4zM16 9h4v11h-4z" },
   { href: "/qr", label: "QR code & link", icon: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2" },
+  { href: "/billing", label: "Plan & billing", icon: "M3 6h18v12H3zM3 10h18M7 15h4" },
   { href: "/settings", label: "Settings", icon: "M4 7h10M18 7h2M4 17h4M12 17h8M14 5v4M8 15v4" },
   { href: "/account", label: "Account", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0" },
 ];

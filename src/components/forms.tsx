@@ -77,7 +77,7 @@ export function useDraft<T>(key: string, initial: T) {
 
 // Fields worth keeping across a refresh: never passwords, codes, files or hidden values.
 const keepable = (el: Element): el is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
-  "name" in el && Boolean((el as HTMLInputElement).name) && !["password", "hidden", "file", "submit", "checkbox"].includes((el as HTMLInputElement).type) && (el as HTMLInputElement).name !== "code";
+  "name" in el && Boolean((el as HTMLInputElement).name) && !["password", "hidden", "file", "submit", "checkbox", "radio"].includes((el as HTMLInputElement).type) && (el as HTMLInputElement).name !== "code";
 
 export function ActionForm({ action, submit, children }: { action: (s: FormState, f: FormData) => Promise<FormState>; submit: string; children: React.ReactNode }) {
   const [state, formAction, pending] = useActionState(action, undefined);

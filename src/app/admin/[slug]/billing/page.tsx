@@ -32,13 +32,16 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
   const daysLeft = b.planExpiresAt ? daysUntil(b.planExpiresAt) : null;
   const active = Boolean(b.plan && isFuture(b.planExpiresAt));
   const chosen = picked ?? b.requestedPlan ?? b.plan ?? "6months";
+  // Started: the approved payment, or (plan switched on by the admin) the end date minus the plan's length.
+  const started = lastPaid?.decidedAt
+    ?? (b.plan && b.planExpiresAt ? new Date(new Date(b.planExpiresAt).setMonth(new Date(b.planExpiresAt).getMonth() - PLANS.find((p) => p.key === b.plan)!.months)).toISOString() : null);
 
   return (
     <div className={page}>
       <PageHeader eyebrow={`${b.name} · Plan & billing`} title="Plan & billing">
-        <Link href="/#pricing" className="text-sm underline decoration-line underline-offset-4 hover:decoration-ink">
-          Compare plans
-        </Link>
+        <a href="#plans" className="text-sm underline decoration-line underline-offset-4 hover:decoration-ink">
+          See plans
+        </a>
       </PageHeader>
 
       {/* Current plan */}
@@ -50,7 +53,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
         <dl className="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
           {[
             ["Plan", b.plan ? planLabel(b.plan) : "None yet"],
-            ["Started", lastPaid?.decidedAt ? day(lastPaid.decidedAt) : "—"],
+            ["Started", started ? day(started) : "—"],
             ["Ends on", b.planExpiresAt ? day(b.planExpiresAt) : "—"],
             ["Days left", daysLeft === null ? "—" : !active ? "Expired" : String(daysLeft)],
           ].map(([k, v]) => (
@@ -90,6 +93,36 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
         )}
       </section>
 
+      {/* All plans, to compare and pick */}
+      <section id="plans" className={`${card} mt-6 scroll-mt-6`}>
+        <h2 className="font-display text-2xl">Plans</h2>
+        <p className="mt-1 text-sm text-muted">Every plan has every feature. Longer plans cost less each month.</p>
+        <ul className="mt-4 grid gap-3 md:grid-cols-3">
+          {PLANS.map((p) => {
+            const current = active && b.plan === p.key;
+            return (
+              <li key={p.key} className={`flex flex-col rounded-xl border-2 bg-paper p-4 ${current ? "border-leaf" : !readOnly && chosen === p.key ? "border-ink" : "border-line"}`}>
+                <p className="flex items-center justify-between gap-2 font-display text-xl">
+                  {p.label}
+                  {current && <span className="rounded-full bg-leaf px-2.5 py-0.5 font-sans text-xs text-paper">Current</span>}
+                </p>
+                <p className="mt-2 font-display text-3xl tabular-nums">{rupees(p.pkr)}</p>
+                <p className="mt-1 text-sm text-muted">
+                  {p.months === 1 ? "1 month" : `${p.months} months`} · {rupees(Math.round(p.pkr / p.months))} a month
+                </p>
+                {!readOnly && !platformOwner && !pending && (
+                  <Link href={`?plan=${p.key}#buy`} scroll={false} className={`mt-4 rounded-full px-4 py-2 text-center text-sm font-medium transition ${chosen === p.key ? "bg-tomato text-tomato-ink hover:brightness-110" : "border border-ink hover:bg-ink hover:text-paper"}`}>
+                    {current ? "Renew" : "Choose"} {p.label}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        {readOnly && <p className="mt-3 text-sm text-muted">Main admin: owners buy here. To switch a plan on yourself, use Manage this business.</p>}
+        {!readOnly && pending && <p className="mt-3 text-sm text-muted">You can pick a new plan once the payment below has been checked.</p>}
+      </section>
+
       {/* Pending payment */}
       {pending && (
         <section className={`${card} mt-6 border-mustard`}>
@@ -121,7 +154,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
 
       {/* Buy / renew */}
       {!readOnly && !pending && !platformOwner && (
-        <section className={`${card} mt-6`}>
+        <section id="buy" className={`${card} mt-6 scroll-mt-6`}>
           <h2 className="font-display text-2xl">{active ? "Renew or change plan" : "Buy a plan"}</h2>
           {active && <p className="mt-1 text-sm text-muted">Renewing the same plan adds its time after your current end date.</p>}
           {accounts.length === 0 ? (
@@ -147,7 +180,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
               <div>
                 <h3 className={eyebrow}>2 · Tell us you paid</h3>
                 <div className="mt-3">
-                  <ActionForm action={submitPayment} submit="Submit payment">
+                  <ActionForm key={chosen} action={submitPayment} submit="Submit payment">
                     <input type="hidden" name="slug" value={slug} />
                     <fieldset className="grid gap-2">
                       <legend className="mb-1 text-sm font-medium">Plan</legend>
