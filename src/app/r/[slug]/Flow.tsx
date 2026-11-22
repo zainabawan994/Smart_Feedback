@@ -53,6 +53,7 @@ export default function Flow({ business: b }: { business: Business }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [leaving, setLeaving] = useState(false); // "copied, here's how to paste" note shown just before Google opens
   const resultRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -116,7 +117,10 @@ export default function Flow({ business: b }: { business: Business }) {
     }
     post("/api/event", { slug: b.slug, type: "copy" });
     post("/api/event", { slug: b.slug, type: "google" });
-    window.location.href = googleLink(b); // the review stays saved here if they come back
+    setBusy(false);
+    setLeaving(true);
+    // A moment to read the steps; the review stays saved here if they come back.
+    setTimeout(() => (window.location.href = googleLink(b)), 2500);
   }
 
   async function copy() {
@@ -298,6 +302,23 @@ export default function Flow({ business: b }: { business: Business }) {
           </div>
           <p className="mt-6 text-sm text-muted">You post it yourself, from your own account. Nothing is posted for you.</p>
         </section>
+      )}
+
+      {leaving && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 px-4" role="alertdialog" aria-live="assertive" aria-label="Review copied">
+          <div className="rise w-full max-w-sm rounded-2xl bg-card p-6 text-center shadow-xl">
+            <p className="font-display text-2xl">Copied ✓</p>
+            <p className="mt-1 text-sm text-muted">Opening Google…</p>
+            <ol className="mt-4 grid gap-2 text-left text-base">
+              <li>1 · Hold in the review box → <span className="font-semibold">Paste</span></li>
+              <li>2 · Pick your stars</li>
+              <li>3 · Tap <span className="font-semibold">Post</span></li>
+            </ol>
+            <a href={googleLink(b)} className="mt-5 block rounded-full bg-tomato px-5 py-3 font-semibold text-tomato-ink">
+              Open Google now
+            </a>
+          </div>
+        </div>
       )}
 
       <footer className="mt-auto pt-12 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-muted">SmartFeedback · Real feedback. Smarter reviews.</footer>
