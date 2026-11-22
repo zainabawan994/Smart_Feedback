@@ -60,6 +60,24 @@ export default function Flow({ business: b }: { business: Business }) {
     post("/api/event", { slug: b.slug, type: "visit" });
   }, [b.slug]);
 
+  // Close the "Copied" box once Google takes over (phones often open the Maps app and leave this tab
+  // behind) or when the customer comes back with Back, so it never stays stuck on screen.
+  const leaveTimer = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const stopLeaving = () => {
+    leaveTimer.current.forEach(clearTimeout);
+    leaveTimer.current = [];
+    setLeaving(false);
+  };
+  useEffect(() => {
+    const onHide = () => document.visibilityState === "hidden" && stopLeaving();
+    window.addEventListener("pageshow", stopLeaving);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pageshow", stopLeaving);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, []);
+
   const toggle = (list: string[], set: (v: string[]) => void, v: string, max: number) =>
     set(list.includes(v) ? list.filter((x) => x !== v) : list.length < max ? [...list, v] : list);
 
@@ -120,7 +138,10 @@ export default function Flow({ business: b }: { business: Business }) {
     setBusy(false);
     setLeaving(true);
     // A moment to read the steps; the review stays saved here if they come back.
-    setTimeout(() => (window.location.href = googleLink(b)), 2500);
+    leaveTimer.current = [
+      setTimeout(() => (window.location.href = googleLink(b)), 2500),
+      setTimeout(stopLeaving, 7000), // still here (Google opened elsewhere or was blocked): don't trap them
+    ];
   }
 
   async function copy() {
@@ -314,9 +335,12 @@ export default function Flow({ business: b }: { business: Business }) {
               <li>2 · Pick your stars</li>
               <li>3 · Tap <span className="font-semibold">Post</span></li>
             </ol>
-            <a href={googleLink(b)} className="mt-5 block rounded-full bg-tomato px-5 py-3 font-semibold text-tomato-ink">
+            <a href={googleLink(b)} onClick={stopLeaving} className="mt-5 block rounded-full bg-tomato px-5 py-3 font-semibold text-tomato-ink">
               Open Google now
             </a>
+            <button type="button" onClick={stopLeaving} className="mt-3 text-sm text-muted underline underline-offset-4">
+              Close
+            </button>
           </div>
         </div>
       )}
