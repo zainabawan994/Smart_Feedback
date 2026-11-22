@@ -1,10 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { isSuperAdmin, requireOwnerPage } from "@/lib/auth";
-import { cancelPayment, cancelPlan, submitPayment } from "@/lib/actions";
+import { cancelPayment, cancelPlan } from "@/lib/actions";
 import { listPayments, type Payment } from "@/lib/store";
 import { PAYMENT_METHODS, PLANS, asPlan, daysUntil, isFuture, planLabel, planState, rupees } from "@/lib/options";
-import { paymentAccounts } from "@/lib/billing";
-import { ActionForm, Field, ReceiptInput, inputCls } from "@/components/forms";
 import { StateBadge } from "@/app/superadmin/ui";
 import { PageHeader, card, day, eyebrow, page, when } from "../ui";
 
@@ -21,17 +20,16 @@ const btn = "rounded-full border border-ink px-4 py-2 text-sm transition hover:b
 export default async function BillingPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ plan?: string }> }) {
   const { slug } = await params;
   const picked = asPlan((await searchParams).plan);
+  if (picked) redirect(`/admin/${slug}/billing/buy?plan=${picked}`); // old "?plan=" links go straight to checkout
   const { user, business: b, asAdmin: readOnly } = await requireOwnerPage(slug);
   // The platform owner doesn't pay herself: her businesses get plans straight from the super-admin panel.
   const platformOwner = isSuperAdmin(user);
   const payments = await listPayments({ slug }, 50);
-  const accounts = paymentAccounts();
   const pending = payments.find((p) => p.status === "pending");
   const lastPaid = payments.find((p) => p.status === "approved");
   const state = planState(b);
   const daysLeft = b.planExpiresAt ? daysUntil(b.planExpiresAt) : null;
   const active = Boolean(b.plan && isFuture(b.planExpiresAt));
-  const chosen = picked ?? b.requestedPlan ?? b.plan ?? "6months";
   // Started: the approved payment, or (plan switched on by the admin) the end date minus the plan's length.
   const started = lastPaid?.decidedAt
     ?? (b.plan && b.planExpiresAt ? new Date(new Date(b.planExpiresAt).setMonth(new Date(b.planExpiresAt).getMonth() - PLANS.find((p) => p.key === b.plan)!.months)).toISOString() : null);
@@ -101,26 +99,29 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
           {PLANS.map((p) => {
             const current = active && b.plan === p.key;
             return (
-              <li key={p.key} className={`flex flex-col rounded-xl border-2 bg-paper p-4 ${current ? "border-leaf" : !readOnly && chosen === p.key ? "border-ink" : "border-line"}`}>
-                <p className="flex items-center justify-between gap-2 font-display text-xl">
-                  {p.label}
-                  {current && <span className="rounded-full bg-leaf px-2.5 py-0.5 font-sans text-xs text-paper">Current</span>}
-                </p>
-                <p className="mt-2 font-display text-3xl tabular-nums">{rupees(p.pkr)}</p>
-                <p className="mt-1 text-sm text-muted">
-                  {p.months === 1 ? "1 month" : `${p.months} months`} · {rupees(Math.round(p.pkr / p.months))} a month
-                </p>
-                {!readOnly && !platformOwner && !pending && (
-                  <Link href={`?plan=${p.key}#buy`} scroll={false} className={`mt-4 rounded-full px-4 py-2 text-center text-sm font-medium transition ${chosen === p.key ? "bg-tomato text-tomato-ink hover:brightness-110" : "border border-ink hover:bg-ink hover:text-paper"}`}>
-                    {current ? "Renew" : "Choose"} {p.label}
-                  </Link>
-                )}
+              <li key={p.key}>
+                <Link
+                  href={`/admin/${slug}/billing/buy?plan=${p.key}`}
+                  className={`flex h-full flex-col rounded-xl border-2 bg-paper p-4 transition hover:border-ink ${current ? "border-leaf" : "border-line"}`}
+                >
+                  <span className="flex items-center justify-between gap-2 font-display text-xl">
+                    {p.label}
+                    {current && <span className="rounded-full bg-leaf px-2.5 py-0.5 font-sans text-xs text-paper">Current</span>}
+                  </span>
+                  <span className="mt-2 font-display text-3xl tabular-nums">{rupees(p.pkr)}</span>
+                  <span className="mt-1 text-sm text-muted">
+                    {p.months === 1 ? "1 month" : `${p.months} months`} · {rupees(Math.round(p.pkr / p.months))} a month
+                  </span>
+                  <span className="mt-4 rounded-full bg-tomato px-4 py-2 text-center text-sm font-medium text-tomato-ink">
+                    {readOnly ? "View" : current ? "Renew" : "Buy"} {p.label} →
+                  </span>
+                </Link>
               </li>
             );
           })}
         </ul>
         {readOnly && <p className="mt-3 text-sm text-muted">Main admin: owners buy here. To switch a plan on yourself, use Manage this business.</p>}
-        {!readOnly && pending && <p className="mt-3 text-sm text-muted">You can pick a new plan once the payment below has been checked.</p>}
+        {!readOnly && pending && <p className="mt-3 text-sm text-muted">You have a payment being checked; you can buy another plan once it&apos;s confirmed.</p>}
       </section>
 
       {/* Pending payment */}
@@ -149,69 +150,6 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
           <Link href={`/superadmin/${slug}`} className="mt-4 inline-block rounded-full bg-ink px-5 py-2.5 text-sm text-paper transition hover:opacity-90">
             Set plan in super admin →
           </Link>
-        </section>
-      )}
-
-      {/* Buy / renew */}
-      {!readOnly && !pending && !platformOwner && (
-        <section id="buy" className={`${card} mt-6 scroll-mt-6`}>
-          <h2 className="font-display text-2xl">{active ? "Renew or change plan" : "Buy a plan"}</h2>
-          {active && <p className="mt-1 text-sm text-muted">Renewing the same plan adds its time after your current end date.</p>}
-          {accounts.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">Payment details will be added here soon. Contact SmartFeedback support to buy a plan.</p>
-          ) : (
-            <div className="mt-5 grid gap-6 lg:grid-cols-2">
-              <div>
-                <h3 className={eyebrow}>1 · Send the amount to</h3>
-                <ul className="mt-3 grid gap-3">
-                  {accounts.map((a) => (
-                    <li key={a.method} className="rounded-xl border border-line bg-paper p-4 text-sm">
-                      <p className="font-medium">{a.label}</p>
-                      {a.lines.map((l) => (
-                        <p key={l} className="mt-0.5 font-mono text-[13px]">
-                          {l}
-                        </p>
-                      ))}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-3 text-xs text-muted">Keep the receipt. You&apos;ll need its transaction ID (TID) in step 2.</p>
-              </div>
-              <div>
-                <h3 className={eyebrow}>2 · Tell us you paid</h3>
-                <div className="mt-3">
-                  <ActionForm key={chosen} action={submitPayment} submit="Submit payment">
-                    <input type="hidden" name="slug" value={slug} />
-                    <fieldset className="grid gap-2">
-                      <legend className="mb-1 text-sm font-medium">Plan</legend>
-                      {PLANS.map((p) => (
-                        <label key={p.key} className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2.5 has-[:checked]:border-ink">
-                          <span className="flex items-center gap-2">
-                            <input type="radio" name="plan" value={p.key} defaultChecked={p.key === chosen} required />
-                            {p.label}
-                          </span>
-                          <span className="font-mono text-sm">{rupees(p.pkr)}</span>
-                        </label>
-                      ))}
-                    </fieldset>
-                    <label className="block">
-                      <span className="text-sm font-medium">Paid with</span>
-                      <select name="method" className={`${inputCls} mt-1.5`} required>
-                        {accounts.map((a) => (
-                          <option key={a.method} value={a.method}>
-                            {a.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <Field label="Transaction ID" hint="from your receipt" name="reference" required minLength={6} maxLength={60} autoComplete="off" />
-                    <Field label="Paid from" hint="your name or mobile number" name="payer" required maxLength={80} />
-                    <ReceiptInput />
-                  </ActionForm>
-                </div>
-              </div>
-            </div>
-          )}
         </section>
       )}
 
