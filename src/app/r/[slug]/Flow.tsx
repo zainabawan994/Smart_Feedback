@@ -14,7 +14,7 @@ const FEELINGS: { key: Sentiment; label: string; ur: string; color: string; mout
 
 function Face({ mouth, color }: { mouth: string; color: string }) {
   return (
-    <svg viewBox="0 0 44 44" className="h-10 w-10" aria-hidden>
+    <svg viewBox="0 0 44 44" className="h-7 w-7" aria-hidden>
       <circle cx="22" cy="22" r="20" fill="none" stroke={color} strokeWidth="2.5" />
       <circle cx="16" cy="18" r="2" fill={color} />
       <circle cx="28" cy="18" r="2" fill={color} />
@@ -43,7 +43,6 @@ function Question({ n, title, hint, children }: { n: number; title: string; hint
 export default function Flow({ business: b }: { business: Business }) {
   const type = typeOf(b.kind); // what "items" means for this kind of business
   const [sentiment, setSentiment] = useDraft<Sentiment | null>(`review:${b.slug}:sentiment`, null);
-  const [picks, setPicks] = useDraft<string[]>(`review:${b.slug}:picks`, []);
   const [items, setItems] = useDraft<string[]>(`review:${b.slug}:items`, []);
   const [note, setNote] = useDraft(`review:${b.slug}:note`, "");
   const [answers, setAnswers] = useDraft<Record<string, string>>(`review:${b.slug}:answers`, {}); // owner's own questions: title → chosen answer
@@ -66,7 +65,7 @@ export default function Flow({ business: b }: { business: Business }) {
     setBusy(true);
     setError("");
     try {
-      const res = await post("/api/generate", { slug: b.slug, sentiment, picks, items, note, lang, answers });
+      const res = await post("/api/generate", { slug: b.slug, sentiment, items, note, lang, answers });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Something went wrong");
       setDraft(json.text);
@@ -88,7 +87,7 @@ export default function Flow({ business: b }: { business: Business }) {
 
   const rtl = lang === "ur";
   const questions = b.questions ?? [];
-  const ready = Boolean(sentiment) && (picks.length > 0 || Object.keys(answers).length > 0 || note.trim().length > 0);
+  const ready = Boolean(sentiment) && (items.length > 0 || Object.keys(answers).length > 0 || note.trim().length > 0);
   let n = 1; // question numbers follow what is actually shown
   const chip = (on: boolean) =>
     `rounded-full border px-4 py-2.5 text-base transition disabled:opacity-35 ${on ? "border-ink bg-ink text-paper" : "border-line bg-card hover:border-ink"}`;
@@ -115,10 +114,10 @@ export default function Flow({ business: b }: { business: Business }) {
         </div>
       </header>
 
-      <h1 className="mt-6 font-display text-[2.1rem] leading-[1.08] tracking-tight" style={{ fontVariationSettings: "'SOFT' 100" }}>
+      <h1 className="mt-5 font-display text-[1.4rem] leading-tight tracking-tight sm:text-[1.9rem]" style={{ fontVariationSettings: "'SOFT' 100" }}>
         How was your visit to <em className="text-tomato">{b.name}</em>?
       </h1>
-      <p className="mt-2 text-base text-muted">Answer a few taps and we&apos;ll write your review. Honest feedback of every kind is welcome.</p>
+      <p className="mt-1.5 text-sm text-muted">Answer a few taps and we&apos;ll write your review. Honest feedback of every kind is welcome.</p>
 
       {/* 1 · Feeling */}
       <div className="mt-6 grid grid-cols-3 gap-2" role="radiogroup" aria-label="How was it">
@@ -130,15 +129,14 @@ export default function Flow({ business: b }: { business: Business }) {
               role="radio"
               aria-checked={on}
               onClick={() => {
-                if (sentiment !== f.key) setPicks([]); // each feeling has its own options
                 setSentiment(f.key);
               }}
-              className={`flex flex-col items-center gap-1.5 rounded-2xl border-2 px-2 py-3 transition ${on ? "bg-card" : "border-line bg-card/60 hover:border-ink"}`}
+              className={`flex flex-col items-center gap-1 rounded-xl border-2 px-1.5 py-2 transition ${on ? "bg-card" : "border-line bg-card/60 hover:border-ink"}`}
               style={on ? { borderColor: f.color } : undefined}
             >
               <Face mouth={f.mouth} color={f.color} />
-              <span className="text-[15px] font-medium leading-tight">{f.label}</span>
-              <span className="urdu text-sm leading-normal text-muted">{f.ur}</span>
+              <span className="text-sm font-medium leading-tight">{f.label}</span>
+              <span className="urdu text-xs leading-normal text-muted">{f.ur}</span>
             </button>
           );
         })}
@@ -146,7 +144,7 @@ export default function Flow({ business: b }: { business: Business }) {
 
       {sentiment && (
         <>
-          {/* 2 · What stood out */}
+          {/* 2 · The owner's own questions */}
           {questions.map((q) => (
             <Question key={q.title} n={++n} title={q.title}>
               <div className="flex flex-wrap gap-2">
@@ -171,19 +169,6 @@ export default function Flow({ business: b }: { business: Business }) {
               </div>
             </Question>
           ))}
-
-          <Question n={++n} title="What stood out?" hint={`pick up to 3 · ${picks.length}/3`}>
-            <div className="flex flex-wrap gap-2">
-              {b.highlights[sentiment].map((h) => {
-                const on = picks.includes(h);
-                return (
-                  <button key={h} aria-pressed={on} onClick={() => toggle(picks, setPicks, h, 3)} disabled={!on && picks.length >= 3} className={chip(on)}>
-                    {h}
-                  </button>
-                );
-              })}
-            </div>
-          </Question>
 
           {/* 3 · Items (only if the owner listed some) */}
           {b.menu.length > 0 && (

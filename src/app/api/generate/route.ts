@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "Photo must be a JPG, PNG or WebP under about 1 MB" }, { status: 400 });
     photo = body.photo;
   }
-  if (!picks.length && !answers.length && !note && !photo) return Response.json({ error: "Pick something or write a few words" }, { status: 400 });
+  if (!picks.length && !items.length && !answers.length && !note && !photo) return Response.json({ error: "Pick something or write a few words" }, { status: 400 });
 
   const result = await draftReview(b, { picks, items, sentiment, lang, occasions, note, photo, answers });
   const tags = [`lang:${lang}`, items.length && "dish", occasions.length && "occasion", photo && "photo", note && "note"].filter(Boolean) as string[];
