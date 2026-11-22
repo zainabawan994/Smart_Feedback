@@ -2,14 +2,8 @@ import Link from "next/link";
 import { getStats, listDrafts } from "@/lib/store";
 import { requireOwnerPage } from "@/lib/auth";
 import { analyze } from "@/lib/insights.ts";
-import { LANG_LABEL, PageHeader, SENT, card, eyebrow, page, when } from "./ui";
+import { PageHeader, SENT, card, eyebrow, page, when } from "./ui";
 
-const SIGNALS = [
-  { key: "dish", label: "Names a dish", hint: "Matches searches like “best bun kebab near me”" },
-  { key: "occasion", label: "Says the occasion", hint: "Matches “family breakfast spot” style questions" },
-  { key: "photo", label: "Has a photo", hint: "Remind customers to attach it on Google too" },
-  { key: "note", label: "Own words added", hint: "Personal detail makes reviews more trusted" },
-];
 const EVENT_LABEL = { visit: "Scanned the QR", generate: "Drafted a review", copy: "Copied review", google: "Opened Google", tap: "Tapped the station" };
 
 export default async function Overview({ params }: { params: Promise<{ slug: string }> }) {
@@ -34,13 +28,13 @@ export default async function Overview({ params }: { params: Promise<{ slug: str
 
   return (
     <div className={page}>
-      <PageHeader eyebrow={`${b.name} · Overview`} title="How it's going" />
+      <PageHeader eyebrow={`${b.name} · Dashboard`} title="How it's going" />
 
       {setupMissing && (
         <Link href={`/admin/${slug}/settings`} className="mt-6 flex items-center justify-between gap-4 rounded-2xl border border-mustard bg-card p-4 text-sm transition hover:border-ink">
           <span>
             <span className="font-medium">Finish setup:</span>{" "}
-            {!b.googleReviewUrl || b.googleReviewUrl.includes("REPLACE_WITH") ? "add your real Google review link" : "add your menu items"} so drafts can name your dishes.
+            {!b.googleReviewUrl || b.googleReviewUrl.includes("REPLACE_WITH") ? "add your real Google review link" : "add what you offer"} so reviews can mention it.
           </span>
           <span aria-hidden>→</span>
         </Link>
@@ -183,43 +177,6 @@ export default async function Overview({ params }: { params: Promise<{ slug: str
           </ul>
         </section>
       )}
-
-      {/* Search signals */}
-      <section className={`${card} mt-6`}>
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-display text-2xl">Search signals</h2>
-          <p className="text-sm text-muted">Share of drafts that carry each detail</p>
-        </div>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          Google Maps and AI assistants like ChatGPT and Gemini pick places from reviews that name the dish, the occasion and the city. These come from what customers choose, never from forced keywords.
-        </p>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {SIGNALS.map((s) => {
-            const pct = c.generate ? Math.round(((stats.signals[s.key] ?? 0) / c.generate) * 100) : 0;
-            return (
-              <div key={s.key}>
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm font-medium">{s.label}</span>
-                  <span className="font-mono text-sm tabular-nums">{pct}%</span>
-                </div>
-                <div className="mt-2 h-1.5 rounded-full bg-paper">
-                  <div className="h-full rounded-full bg-leaf" style={{ width: `${pct}%` }} />
-                </div>
-                <p className="mt-1.5 text-xs text-muted">{s.hint}</p>
-              </div>
-            );
-          })}
-        </div>
-        <div className="dashed my-5" />
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-          <span className={eyebrow}>Languages</span>
-          {(Object.keys(LANG_LABEL) as (keyof typeof LANG_LABEL)[]).map((k) => (
-            <span key={k} className={k === "ur" ? "urdu leading-normal" : ""}>
-              {LANG_LABEL[k]} <span className="font-mono text-muted">{stats.signals[`lang:${k}`] ?? 0}</span>
-            </span>
-          ))}
-        </div>
-      </section>
 
       {/* Latest drafts teaser */}
       <section className={`${card} mt-6`}>

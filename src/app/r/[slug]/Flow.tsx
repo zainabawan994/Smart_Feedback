@@ -23,8 +23,9 @@ function Face({ mouth, color }: { mouth: string; color: string }) {
   );
 }
 
+// keepalive: events still arrive when the page is leaving for Google.
 const post = (url: string, body: object) =>
-  fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), keepalive: true });
 
 function Question({ n, title, hint, children }: { n: number; title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -61,21 +62,61 @@ export default function Flow({ business: b }: { business: Business }) {
   const toggle = (list: string[], set: (v: string[]) => void, v: string, max: number) =>
     set(list.includes(v) ? list.filter((x) => x !== v) : list.length < max ? [...list, v] : list);
 
+  const showResult = () => setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+
+  async function fetchDraft(): Promise<string> {
+    const res = await post("/api/generate", { slug: b.slug, sentiment, items, note, lang, answers });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Something went wrong");
+    setDraft(json.text);
+    setAiBusy(Boolean(json.aiBusy));
+    return json.text;
+  }
+
+  /** "Check it first": write the review and show it here to edit. */
   async function generate() {
     setBusy(true);
     setError("");
     try {
-      const res = await post("/api/generate", { slug: b.slug, sentiment, items, note, lang, answers });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Something went wrong");
-      setDraft(json.text);
-      setAiBusy(Boolean(json.aiBusy));
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+      await fetchDraft();
+      showResult();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Fewest taps: write the review, copy it, and go straight to Google to paste and post. */
+  async function quickPost() {
+    setBusy(true);
+    setError("");
+    const text = fetchDraft();
+    let copiedOk = false;
+    try {
+      // The copy must start inside the tap (Safari), so hand the clipboard a promise of the text.
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write)
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": text.then((t) => new Blob([t], { type: "text/plain" })) })]);
+      else await navigator.clipboard.writeText(await text);
+      copiedOk = true;
+    } catch {}
+    try {
+      await text;
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+      return;
+    }
+    if (!copiedOk) {
+      // Couldn't copy on this phone: show the review so they can copy it by hand.
+      setBusy(false);
+      setError("Couldn't copy automatically. Tap “Copy review” below, then open Google.");
+      showResult();
+      return;
+    }
+    post("/api/event", { slug: b.slug, type: "copy" });
+    post("/api/event", { slug: b.slug, type: "google" });
+    window.location.href = googleLink(b); // the review stays saved here if they come back
   }
 
   async function copy() {
@@ -201,14 +242,25 @@ export default function Flow({ business: b }: { business: Business }) {
 
           {error && <p className="mt-4 text-base text-plum">{error}</p>}
 
-          <button
-            onClick={generate}
-            disabled={!ready || busy}
-            className="mt-6 w-full rounded-full bg-tomato px-5 py-4 text-lg font-semibold text-tomato-ink transition hover:brightness-110 disabled:opacity-40"
-          >
-            {busy ? "Writing your review…" : draft ? "Write it again" : "Continue"}
-          </button>
-          {!ready && <p className="mt-2 text-center text-sm text-muted">Answer at least one question above.</p>}
+          <div className="mt-6 grid gap-2.5">
+            <button
+              onClick={quickPost}
+              disabled={!ready || busy}
+              className="w-full rounded-full bg-tomato px-5 py-4 text-lg font-semibold text-tomato-ink transition hover:brightness-110 disabled:opacity-40"
+            >
+              {busy ? "Writing your review…" : "Write & post on Google"}
+            </button>
+            <button
+              onClick={generate}
+              disabled={!ready || busy}
+              className="w-full rounded-full border-2 border-ink px-5 py-3 text-base font-semibold transition hover:bg-ink hover:text-paper disabled:opacity-40"
+            >
+              {draft ? "Write it again" : "Write & check it first"}
+            </button>
+          </div>
+          <p className="mt-2 text-center text-sm text-muted">
+            {ready ? "We copy your review and open Google. Just paste and post." : "Answer at least one question above."}
+          </p>
         </>
       )}
 
