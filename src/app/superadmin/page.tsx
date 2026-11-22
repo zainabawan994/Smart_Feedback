@@ -26,7 +26,11 @@ export default async function SuperAdmin() {
     <main className={shell}>
       <TopBar email={user.email} />
       <div className="mt-8">
-        <PageHeader eyebrow="Whole platform" title="All businesses" />
+        <PageHeader eyebrow="Whole platform" title="All businesses">
+          <Link href="/superadmin/new" className="rounded-full bg-ink px-5 py-2.5 text-sm text-paper transition hover:opacity-90">
+            + Add business &amp; owner
+          </Link>
+        </PageHeader>
       </div>
 
       <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4 lg:grid-cols-8" aria-label="Totals">

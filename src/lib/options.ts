@@ -13,6 +13,25 @@ export const LANGS = [
 // "When / who with" chips live per business type in business-types.ts.
 
 export const NOTE_MAX = 300;
+
+/** Email shape for <input pattern> and the server: name@domain.tld, letters/digits/._%+- only. */
+export const EMAIL_PATTERN = "[A-Za-z0-9._%+\\-]+@[A-Za-z0-9\\-]+(\\.[A-Za-z0-9\\-]+)*\\.[A-Za-z]{2,}";
+const EMAIL_RE = new RegExp(`^${EMAIL_PATTERN}$`);
+// Common misspellings, so a code is never mailed to a typo'd address.
+const EMAIL_TYPOS: Record<string, string> = {
+  "gmial.com": "gmail.com", "gmai.com": "gmail.com", "gmal.com": "gmail.com", "gamil.com": "gmail.com", "gnail.com": "gmail.com",
+  "gmail.co": "gmail.com", "gmail.con": "gmail.com", "gmail.cm": "gmail.com", "gmail.om": "gmail.com",
+  "yaho.com": "yahoo.com", "yahoo.con": "yahoo.com", "yahoo.co": "yahoo.com",
+  "hotmial.com": "hotmail.com", "hotmail.con": "hotmail.com", "hotmai.com": "hotmail.com",
+  "outlok.com": "outlook.com", "outlook.con": "outlook.com", "icloud.con": "icloud.com",
+};
+/** null if the email looks right, else a message to show. */
+export function emailProblem(email: string): string | null {
+  if (email.length > 254 || email.includes("..") || !EMAIL_RE.test(email)) return "Enter a valid email, like name@gmail.com.";
+  const [name, domain] = email.split("@");
+  const fix = EMAIL_TYPOS[domain.toLowerCase()];
+  return fix ? `Check the email: did you mean ${name}@${fix}?` : null;
+}
 export const RECEIPT_MAX_CHARS = 900_000; // receipt screenshot as a data URL (~650 KB image); the page shrinks it first
 export const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
 export const PHOTO_MAX_CHARS = 1_500_000; // ~1.1 MB image as a data URL; the page downsizes before sending

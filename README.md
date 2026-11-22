@@ -12,6 +12,7 @@ npm test        # normalizer + stats checks
 
 - Customer page: `/r/chai-khana`
 - Owner desk: `/signup` to create your own business, then `/login`. Without Supabase (local `data/db.json` only), a demo owner for the demo café is created automatically; see `DEMO_OWNER` in `src/lib/store.ts`. It is never copied to Supabase.
+- Demo mode: `npm run dev:demo` (port 3011) uses `data/demo.json`, prints emails to the log and never touches Supabase. It creates a dummy main admin: log in at `/superadmin/login` with `admin@smartfeedback.test` / `admin-demo-2026` (`DEMO_ADMIN` in `src/lib/store.ts`). The demo owner above works at `/login`.
 
 Works with no config: template draft, rule-based tidy-up, data in `data/db.json`.
 

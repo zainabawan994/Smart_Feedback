@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useDraft } from "@/components/forms";
 import { useRouter } from "next/navigation";
 import type { Business } from "@/lib/store";
 import { inputCls } from "@/components/forms";
-import { SENT } from "../ui";
 import { BUSINESS_TYPES, typeOf } from "@/lib/business-types";
 import { QUESTIONS_MAX, QUESTION_OPTIONS_MAX } from "@/lib/options";
 
@@ -22,15 +22,17 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 export default function SettingsForm({ initial, readOnly = false }: { initial: Business; readOnly?: boolean }) {
   const router = useRouter();
-  const [b, setB] = useState(initial);
-  const [menu, setMenu] = useState(initial.menu.join("\n"));
-  const [hl, setHl] = useState({
+  // Unsaved edits are kept per business, so a refresh doesn't lose them.
+  const k = `settings:${initial.slug}`;
+  const [b, setB] = useDraft(`${k}:b`, initial);
+  const [menu, setMenu] = useDraft(`${k}:menu`, initial.menu.join("\n"));
+  const [hl, setHl] = useDraft(`${k}:hl`, {
     positive: initial.highlights.positive.join("\n"),
     neutral: initial.highlights.neutral.join("\n"),
     negative: initial.highlights.negative.join("\n"),
   });
   // Owner's own questions, edited as a title + one option per line.
-  const [qs, setQs] = useState((initial.questions ?? []).map((q) => ({ title: q.title, options: q.options.join("\n") })));
+  const [qs, setQs] = useDraft(`${k}:qs`, (initial.questions ?? []).map((q) => ({ title: q.title, options: q.options.join("\n") })));
   const setQ = (i: number, patch: Partial<{ title: string; options: string }>) => setQs(qs.map((q, j) => (j === i ? { ...q, ...patch } : q)));
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -79,7 +81,7 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
           </Field>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Type">
-              <select className={inputCls} value={typeOf(b.kind).noun} onChange={(e) => setB({ ...b, kind: e.target.value })}>
+              <select className={inputCls} value={typeOf(b.kind).noun} onChange={(e) => { const t = typeOf(e.target.value); setB({ ...b, kind: e.target.value }); setHl({ positive: t.highlights.positive.join("\n"), neutral: t.highlights.neutral.join("\n"), negative: t.highlights.negative.join("\n") }); }}>
                 {BUSINESS_TYPES.map((t) => (
                   <option key={t.key} value={t.noun}>
                     {t.label}
@@ -142,31 +144,6 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
             + Add a question
           </button>
         )}
-      </section>
-
-      <section className={section}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-2xl">Options customers can pick</h2>
-            <p className="mt-1 text-sm text-muted">One set per feeling. Keep them honest and specific, like &quot;{type.highlights.positive[0]}&quot; or &quot;{type.highlights.negative[0]}&quot;.</p>
-          </div>
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => setHl({ positive: type.highlights.positive.join("\n"), neutral: type.highlights.neutral.join("\n"), negative: type.highlights.negative.join("\n") })}
-            className="rounded-full border border-ink px-4 py-2 text-sm transition hover:bg-ink hover:text-paper disabled:opacity-50"
-          >
-            Use suggested options for {type.label}
-          </button>
-        </div>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          {SENT.map((s) => (
-            <Field key={s.key} label={s.label} hint="one per line">
-              <textarea className={`${inputCls} text-sm`} style={{ borderLeft: `3px solid ${s.color}` }} rows={8} value={hl[s.key]} onChange={(e) => setHl({ ...hl, [s.key]: e.target.value })} />
-            </Field>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-muted">Don&apos;t add options that tell customers what to say about you. Google treats scripted content as a policy issue.</p>
       </section>
 
       <div className="sticky bottom-0 -mx-4 flex items-center gap-4 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border">

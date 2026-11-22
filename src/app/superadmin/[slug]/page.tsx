@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/auth";
-import { decidePaymentAction, superAdminUpdateBusiness } from "@/lib/actions";
+import { decidePaymentAction, superAdminOwnerAccount, superAdminSetOwner, superAdminUpdateBusiness } from "@/lib/actions";
 import { getStats, listPayments, listPlatformBusinesses } from "@/lib/store";
-import { ActionForm, inputCls } from "@/components/forms";
+import { ActionForm, Field, inputCls } from "@/components/forms";
 import { PageHeader, card, day, eyebrow, when } from "../../admin/[slug]/ui";
 import { PAYMENT_METHODS, PLANS, TIME_ZONE, planLabel, planState, rupees } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "../ui";
@@ -109,7 +109,7 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
           </div>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link href={`/admin/${b.slug}`} className="rounded-full bg-ink px-5 py-2.5 text-sm text-paper transition hover:opacity-90">
-              Open their desk (read-only)
+              Open & edit their desk
             </Link>
             <a href={`/r/${b.slug}`} target="_blank" className="rounded-full border border-ink px-5 py-2.5 text-sm transition hover:bg-ink hover:text-paper">
               Customer page ↗
@@ -117,6 +117,37 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
           </div>
         </section>
       </div>
+
+      <section className={`${card} mt-6`}>
+        <h2 className="font-display text-2xl">Owner access</h2>
+        <p className="mt-1 text-sm text-muted">
+          The owner sees and edits only their own businesses. {b.ownerEmail ? <>Current owner: <span className="font-medium text-ink">{b.ownerEmail}</span>.</> : "No owner yet."}
+        </p>
+        <div className="mt-5 grid gap-6 lg:grid-cols-2">
+          <div>
+            <h3 className={eyebrow}>{b.ownerEmail ? "Move to another owner" : "Give access"}</h3>
+            <p className="mb-3 mt-1 text-xs text-muted">The previous owner loses access. Password is needed only for a new email.</p>
+            <ActionForm action={superAdminSetOwner} submit={b.ownerEmail ? "Move business" : "Give access"}>
+              <input type="hidden" name="slug" value={b.slug} />
+              <Field label="Owner email" name="ownerEmail" type="email" autoComplete="off" required />
+              <Field label="Password" hint="new owner only · 8+ characters" name="password" type="password" autoComplete="new-password" minLength={8} />
+            </ActionForm>
+          </div>
+          {b.ownerEmail && (
+            <div>
+              <h3 className={eyebrow}>Owner&apos;s login</h3>
+              <p className="mb-3 mt-1 text-xs text-muted">A new password logs the owner out on every device.</p>
+              <ActionForm action={superAdminOwnerAccount} submit="Save login">
+                <input type="hidden" name="slug" value={b.slug} />
+                <Field label="New password" hint="8+ characters" name="password" type="password" autoComplete="new-password" minLength={8} />
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="verify" className="h-4 w-4" /> Mark email verified (skip the email code)
+                </label>
+              </ActionForm>
+            </div>
+          )}
+        </div>
+      </section>
 
       <section className={`${card} mt-6`}>
         <h2 className="font-display text-2xl">Payments</h2>

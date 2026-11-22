@@ -15,7 +15,7 @@ const ITEMS = [
 ];
 
 /** Owner desk menu: a sidebar list on large screens, a ☰ button with a drop-down panel on phones. */
-export default function Nav({ slug, superAdmin = false }: { slug: string; superAdmin?: boolean }) {
+export default function Nav({ slug }: { slug: string }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -58,11 +58,6 @@ export default function Nav({ slug, superAdmin = false }: { slug: string; superA
             </Link>
           );
         })}
-        {superAdmin && (
-          <Link href="/superadmin" onClick={close} className="mt-1 rounded-lg bg-ink px-3 py-2.5 text-center text-sm text-paper lg:hidden">
-            Super admin
-          </Link>
-        )}
       </nav>
     </>
   );

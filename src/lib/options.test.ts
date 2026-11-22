@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { googleLink, normalizeReviewUrl, planState } from "./options.ts";
+import { emailProblem, googleLink, normalizeReviewUrl, planState } from "./options.ts";
 
 assert.equal(normalizeReviewUrl(""), "");
 assert.equal(normalizeReviewUrl(" https://g.page/r/abc/review "), "https://g.page/r/abc/review");
@@ -74,3 +74,11 @@ console.log("options.test plan state: ok");
   assert.deepEqual(validAnswers(qs, null), []);
   console.log("options.test custom questions: ok");
 }
+
+assert.equal(emailProblem("ali.khan+shop@gmail.com"), null);
+assert.equal(emailProblem("owner@chaikhana.test"), null);
+assert.equal(emailProblem("a@b.co.uk"), null);
+for (const bad of ["", "ali", "ali@", "ali@gmail", "ali@@gmail.com", "ali @gmail.com", "ali@gmail..com", "ali@gmail.c", "<x>@gmail.com"]) assert.ok(emailProblem(bad), bad);
+assert.equal(emailProblem("ali@gmial.com"), "Check the email: did you mean ali@gmail.com?");
+assert.ok(emailProblem("ali@gmail.con")?.includes("ali@gmail.com"));
+console.log("options.test email: ok");

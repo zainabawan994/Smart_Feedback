@@ -5,19 +5,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
-import { createBusiness, createPayment, createUser, getBusiness, getPayment, getUserByEmail, setPaymentStatus, updateBusiness, updateUser } from "./store";
+import { createBusiness, createPayment, createUser, getBusiness, getPayment, getUserByEmail, getUserById, setBusinessOwner, setPaymentStatus, updateBusiness, updateUser } from "./store";
 import { paymentAccounts } from "./billing.ts";
 import { hashPassword, verifyPassword } from "./password.ts";
 import { typeOf } from "./business-types.ts";
-import { IMAGE_DATA_URL, PLANS, RECEIPT_MAX_CHARS, asPlan, normalizeReviewUrl, planEnd, planInfo, planLabel, rupees, type Plan } from "./options.ts";
+import { IMAGE_DATA_URL, PLANS, emailProblem, RECEIPT_MAX_CHARS, asPlan, normalizeReviewUrl, planEnd, planInfo, planLabel, rupees, type Plan } from "./options.ts";
 import { TOO_MANY, allow, clientIp } from "./guard.ts";
 
 export type FormState = { error?: string; info?: string; sentAt?: number } | undefined;
 
 const str = (f: FormData, k: string, max = 120) => String(f.get(k) ?? "").trim().slice(0, max);
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Only redirect inside the admin area, never to another site.
-const safeNext = (n: string) => (/^\/admin(\/[a-z0-9-]*)*$/.test(n) ? n : "/admin");
+// Only redirect inside the owner desk or admin panel, never to another site.
+const safeNext = (n: string) => (/^\/(admin|superadmin)(\/[a-z0-9-]*)*$/.test(n) ? n : "/admin");
 const RESET_COOKIE = "sf_reset_email";
 const NEW_EMAIL_COOKIE = "sf_new_email"; // pending address during "change email"; the code mailed to it proves ownership
 
@@ -51,27 +50,15 @@ async function trySend(email: string, purpose: "verify" | "reset") {
 
 /* ---------------- sign up / log in / log out ---------------- */
 
-export async function signup(_: FormState, f: FormData): Promise<FormState> {
-  if (!(await ipAllowed("signup-ip", 5, 3600))) return { error: TOO_MANY };
-  const email = str(f, "email").toLowerCase();
-  if (!EMAIL.test(email)) return { error: "Enter a valid email." };
-  const pw = newPassword(f);
-  if ("error" in pw) return pw;
-  const { place, error } = placeFields(f);
-  if (!place) return { error };
-  const user = await createUser(email, pw.password);
-  if (!user) return { error: "That email already has an account. Log in instead." };
-  const business = await createBusiness(place, user.id);
-  const plan = asPlan(f.get("plan"));
-  if (plan) await updateBusiness(business.slug, { requestedPlan: plan }); // picked on the pricing page
-  await startSession(user);
-  const sent = await trySend(email, "verify");
-  redirect("failed" in sent ? "/verify?unsent=1" : "/verify");
+export async function signup(): Promise<FormState> {
+  return { error: "Sign-up is closed. The SmartFeedback admin creates owner accounts." };
 }
 
 export async function login(_: FormState, f: FormData): Promise<FormState> {
   const email = str(f, "email").toLowerCase();
   if (!(await ipAllowed("login-ip", 30, 900))) return { error: TOO_MANY }; // many emails from one place = credential stuffing
+  const bad = emailProblem(email);
+  if (bad) return { error: bad };
   if (await loginBlocked(email)) return { error: "Too many tries. Wait 15 minutes, or reset your password." };
   const user = await getUserByEmail(email);
   // Same message either way so the form doesn't reveal which emails have accounts.
@@ -85,8 +72,11 @@ export async function login(_: FormState, f: FormData): Promise<FormState> {
     const sent = await trySend(email, "verify"); // no-op if one was sent in the last minute
     redirect("failed" in sent ? "/verify?unsent=1" : "/verify");
   }
+  // Three screens: the main admin goes to the admin panel, owners go to their own desk.
+  const next = safeNext(str(f, "next", 200));
+  if (isSuperAdmin(user)) redirect(next.startsWith("/superadmin") ? next : "/superadmin");
   const plan = asPlan(f.get("plan"));
-  redirect(plan ? `/admin/plan?plan=${plan}` : safeNext(str(f, "next", 200)));
+  redirect(plan ? `/admin/plan?plan=${plan}` : next.startsWith("/superadmin") ? "/admin" : next);
 }
 
 export async function logout() {
@@ -120,7 +110,8 @@ export async function resendVerification(): Promise<FormState> {
 export async function forgotPassword(_: FormState, f: FormData): Promise<FormState> {
   if (!(await ipAllowed("forgot-ip", 5, 900))) return { error: TOO_MANY };
   const email = str(f, "email").toLowerCase();
-  if (!EMAIL.test(email)) return { error: "Enter a valid email." };
+  const bad = emailProblem(email);
+  if (bad) return { error: bad };
   // Only send if the account exists, but behave the same either way (no account probing).
   if (await getUserByEmail(email)) {
     const r = await trySend(email, "reset");
@@ -180,7 +171,8 @@ export async function startEmailChange(_: FormState, f: FormData): Promise<FormS
   if (!(await allow("email-change", user.id, 5, 3600))) return { error: TOO_MANY };
   if (!verifyPassword(String(f.get("current") ?? ""), user.passwordHash)) return { error: "Your current password is wrong." };
   const email = str(f, "email").toLowerCase();
-  if (!EMAIL.test(email)) return { error: "Enter a valid email." };
+  const bad = emailProblem(email);
+  if (bad) return { error: bad };
   if (email === user.email) return { error: "That is already your email." };
   if (await getUserByEmail(email)) return { error: "That email already has an account." };
   const r = await trySend(email, "verify");
@@ -319,11 +311,63 @@ export async function superAdminUpdateBusiness(_: FormState, f: FormData): Promi
   return { info: "Saved." };
 }
 
+/** Super admin only: add a business for an owner. A new owner email gets an account with the given
+ *  password (they verify their email on first login); an existing owner just gets the extra business. */
 export async function addBusiness(_: FormState, f: FormData): Promise<FormState> {
   const user = await currentUser();
-  if (!user) redirect("/login");
+  if (!isSuperAdmin(user)) return { error: "Not allowed." };
+  const email = str(f, "ownerEmail").toLowerCase();
+  const bad = emailProblem(email);
+  if (bad) return { error: `Owner email: ${bad}` };
   const { place, error } = placeFields(f);
   if (!place) return { error };
-  const business = await createBusiness(place, user.id);
-  redirect(`/admin/${business.slug}/settings?welcome=1`);
+  let owner = await getUserByEmail(email);
+  if (!owner) {
+    const pw = newPassword(f);
+    if ("error" in pw) return { error: `New owner: ${pw.error}` };
+    owner = await createUser(email, pw.password);
+    if (!owner) return { error: "Could not create that owner." };
+  }
+  const business = await createBusiness(place, owner.id);
+  revalidatePath("/superadmin");
+  redirect(`/superadmin/${business.slug}`);
+}
+
+/** Super admin: give a business to an owner by email. A new email gets an account with the given password. */
+export async function superAdminSetOwner(_: FormState, f: FormData): Promise<FormState> {
+  if (!isSuperAdmin(await currentUser())) return { error: "Not allowed." };
+  const slug = str(f, "slug", 40);
+  if (!(await getBusiness(slug))) return { error: "Business not found." };
+  const email = str(f, "ownerEmail").toLowerCase();
+  const bad = emailProblem(email);
+  if (bad) return { error: `Owner email: ${bad}` };
+  let owner = await getUserByEmail(email);
+  if (!owner) {
+    const pw = newPassword(f);
+    if ("error" in pw) return { error: `New owner: ${pw.error}` };
+    owner = await createUser(email, pw.password);
+    if (!owner) return { error: "Could not create that owner." };
+  }
+  await setBusinessOwner(slug, owner.id);
+  revalidatePath("/superadmin");
+  revalidatePath(`/superadmin/${slug}`);
+  return { info: `${email} now has access to this business.` };
+}
+
+/** Super admin: set a new password for this business's owner (logs them out everywhere), and/or vouch for their email. */
+export async function superAdminOwnerAccount(_: FormState, f: FormData): Promise<FormState> {
+  if (!isSuperAdmin(await currentUser())) return { error: "Not allowed." };
+  const business = await getBusiness(str(f, "slug", 40));
+  const owner = business?.ownerId ? await getUserById(business.ownerId) : null;
+  if (!owner) return { error: "This business has no owner yet." };
+  const patch: Parameters<typeof updateUser>[1] = f.get("verify") === "on" ? { emailVerified: true } : {};
+  if (String(f.get("password") ?? "")) {
+    const pw = newPassword(f);
+    if ("error" in pw) return pw;
+    patch.passwordHash = hashPassword(pw.password);
+  }
+  if (!Object.keys(patch).length) return { error: "Type a new password or tick \"Mark email verified\"." };
+  await updateUser(owner.id, patch);
+  revalidatePath("/superadmin");
+  return { info: patch.passwordHash ? `Password changed for ${owner.email}. Share it with them privately.` : `${owner.email} marked verified.` };
 }

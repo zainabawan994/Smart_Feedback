@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useActionState, useEffect, useState } from "react";
+import { startTransition, useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { FormState } from "@/lib/actions";
 import { shrinkImage } from "@/lib/image";
 import { BUSINESS_TYPES } from "@/lib/business-types";
+import { EMAIL_PATTERN } from "@/lib/options";
 
 export const inputCls = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-[15px] outline-none transition focus:border-ink";
 
@@ -13,7 +15,7 @@ export function Field({ label, hint, ...props }: { label: string; hint?: string 
     <label className="block">
       <span className="text-sm font-medium">{label}</span>
       {hint && <span className="ml-2 text-xs text-muted">{hint}</span>}
-      <input className={`${inputCls} mt-1.5`} {...props} />
+      <input className={`${inputCls} mt-1.5`} {...(props.type === "email" ? { pattern: EMAIL_PATTERN, title: "An email like name@gmail.com", maxLength: 254 } : {})} {...props} />
     </label>
   );
 }
@@ -48,15 +50,67 @@ export function PlaceFields() {
   );
 }
 
+/** Like useState, but the value survives a page refresh (kept in this browser tab only). */
+export function useDraft<T>(key: string, initial: T) {
+  const [value, setValue] = useState(initial);
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(key);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restore after hydration so server and client HTML match
+      if (saved) setValue(JSON.parse(saved));
+    } catch {}
+  }, [key]);
+  // Saved only when the user changes something, so the starting value never overwrites a saved draft.
+  const set = useCallback(
+    (next: T | ((prev: T) => T)) =>
+      setValue((prev) => {
+        const v = typeof next === "function" ? (next as (p: T) => T)(prev) : next;
+        try {
+          sessionStorage.setItem(key, JSON.stringify(v));
+        } catch {}
+        return v;
+      }),
+    [key],
+  );
+  return [value, set] as const;
+}
+
+// Fields worth keeping across a refresh: never passwords, codes, files or hidden values.
+const keepable = (el: Element): el is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
+  "name" in el && Boolean((el as HTMLInputElement).name) && !["password", "hidden", "file", "submit", "checkbox"].includes((el as HTMLInputElement).type) && (el as HTMLInputElement).name !== "code";
+
 export function ActionForm({ action, submit, children }: { action: (s: FormState, f: FormData) => Promise<FormState>; submit: string; children: React.ReactNode }) {
   const [state, formAction, pending] = useActionState(action, undefined);
+  const form = useRef<HTMLFormElement>(null);
+  const key = `form:${usePathname()}:${submit}`;
+  const remember = () => {
+    try {
+      const values = Object.fromEntries([...(form.current?.elements ?? [])].filter(keepable).map((el) => [el.name, el.value]));
+      sessionStorage.setItem(key, JSON.stringify(values));
+    } catch {}
+  };
+  useEffect(() => {
+    try {
+      const saved: Record<string, string> = JSON.parse(sessionStorage.getItem(key) ?? "{}");
+      for (const el of [...(form.current?.elements ?? [])].filter(keepable)) if (saved[el.name] !== undefined) el.value = saved[el.name];
+    } catch {}
+  }, [key]);
+  // Submitted fine (redirected away or showed "Saved"): forget the draft. On an error, keep what was typed.
+  useEffect(() => {
+    if (state?.error) remember();
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps -- remember only reads the form
   return (
     <form
+      ref={form}
       className="grid gap-4"
+      onInput={remember}
       // Submitting through onSubmit (not the action prop) stops React from clearing the fields after an error.
       onSubmit={(e) => {
         e.preventDefault();
         const data = new FormData(e.currentTarget);
+        try {
+          sessionStorage.removeItem(key);
+        } catch {}
         startTransition(() => formAction(data));
       }}
     >

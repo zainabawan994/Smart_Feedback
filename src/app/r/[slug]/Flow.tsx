@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Business, Lang, Sentiment } from "@/lib/store";
 import { LANGS, NOTE_MAX, googleLink } from "@/lib/options";
 import { typeOf } from "@/lib/business-types";
+import { useDraft } from "@/components/forms";
 
 const FEELINGS: { key: Sentiment; label: string; ur: string; color: string; mouth: string }[] = [
   { key: "positive", label: "Loved it", ur: "بہت اچھا", color: "var(--leaf)", mouth: "M14 27 Q22 35 30 27" },
@@ -41,13 +42,13 @@ function Question({ n, title, hint, children }: { n: number; title: string; hint
 /** One screen, up to four quick questions, then the AI review appears right below. */
 export default function Flow({ business: b }: { business: Business }) {
   const type = typeOf(b.kind); // what "items" means for this kind of business
-  const [sentiment, setSentiment] = useState<Sentiment | null>(null);
-  const [picks, setPicks] = useState<string[]>([]);
-  const [items, setItems] = useState<string[]>([]);
-  const [note, setNote] = useState("");
-  const [answers, setAnswers] = useState<Record<string, string>>({}); // owner's own questions: title → chosen answer
-  const [lang, setLang] = useState<Lang>(b.defaultLang);
-  const [draft, setDraft] = useState("");
+  const [sentiment, setSentiment] = useDraft<Sentiment | null>(`review:${b.slug}:sentiment`, null);
+  const [picks, setPicks] = useDraft<string[]>(`review:${b.slug}:picks`, []);
+  const [items, setItems] = useDraft<string[]>(`review:${b.slug}:items`, []);
+  const [note, setNote] = useDraft(`review:${b.slug}:note`, "");
+  const [answers, setAnswers] = useDraft<Record<string, string>>(`review:${b.slug}:answers`, {}); // owner's own questions: title → chosen answer
+  const [lang, setLang] = useDraft<Lang>(`review:${b.slug}:lang`, b.defaultLang);
+  const [draft, setDraft] = useDraft(`review:${b.slug}:draft`, "");
   const [aiBusy, setAiBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

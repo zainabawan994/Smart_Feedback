@@ -1,26 +1,25 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { sessionUser } from "@/lib/auth";
-import { addBusiness } from "@/lib/actions";
-import { ActionForm, AuthCard, PlaceFields } from "@/components/forms";
+import { isSuperAdmin, sessionUser } from "@/lib/auth";
+import { logout } from "@/lib/actions";
+import { AuthCard } from "@/components/forms";
 
-export default async function NewBusinessPage() {
+// Owners can't add businesses; the main admin does that from /superadmin/new.
+export default async function NoBusinessPage() {
   const user = await sessionUser();
-  if (!user) redirect("/login?next=/admin/new");
+  if (!user) redirect("/login");
   if (!user.emailVerified) redirect("/verify");
+  if (isSuperAdmin(user)) redirect("/superadmin/new");
   return (
     <AuthCard
-      eyebrow="Owner desk · New location"
-      title="Add a business."
+      eyebrow="Business owner"
+      title="No business yet."
       footer={
-        <Link href="/admin" className="text-ink underline underline-offset-4">
-          ← Back to my desk
-        </Link>
+        <form action={logout}>
+          <button className="text-ink underline underline-offset-4">Log out</button>
+        </form>
       }
     >
-      <ActionForm action={addBusiness} submit="Add business">
-        <PlaceFields />
-      </ActionForm>
+      <p className="text-muted">Your account has no business linked to it. Ask the SmartFeedback admin to add one for you.</p>
     </AuthCard>
   );
 }

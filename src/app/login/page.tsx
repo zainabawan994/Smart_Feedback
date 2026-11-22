@@ -12,15 +12,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (user) redirect(!user.emailVerified ? "/verify" : plan ? `/admin/plan?plan=${plan}` : "/admin");
   return (
     <AuthCard
-      eyebrow="Owner desk · Log in"
+      eyebrow="Business owner · Log in"
       title="Welcome back."
       footer={
-        <>
-          New here?{" "}
-          <Link href={plan ? `/signup?plan=${plan}` : "/signup"} className="text-ink underline underline-offset-4">
-            Set up your business
-          </Link>
-        </>
+<>No account? The SmartFeedback admin creates owner accounts.</>
       }
     >
       {plan && <PlanNote label={planLabel(plan)} />}

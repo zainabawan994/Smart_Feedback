@@ -21,7 +21,7 @@ const btn = "rounded-full border border-ink px-4 py-2 text-sm transition hover:b
 export default async function BillingPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ plan?: string }> }) {
   const { slug } = await params;
   const picked = asPlan((await searchParams).plan);
-  const { user, business: b, readOnly } = await requireOwnerPage(slug);
+  const { user, business: b, asAdmin: readOnly } = await requireOwnerPage(slug);
   // The platform owner doesn't pay herself: her businesses get plans straight from the super-admin panel.
   const platformOwner = isSuperAdmin(user);
   const payments = await listPayments({ slug }, 50);

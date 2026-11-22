@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { isSuperAdmin, requireOwnerPage } from "@/lib/auth";
+import { requireOwnerPage } from "@/lib/auth";
 import { listBusinesses } from "@/lib/store";
 import { logout } from "@/lib/actions";
 import { planState } from "@/lib/options";
@@ -7,7 +7,7 @@ import Nav from "./Nav";
 
 export default async function AdminLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { user, business, readOnly } = await requireOwnerPage(slug);
+  const { user, business, asAdmin } = await requireOwnerPage(slug);
   const all = await listBusinesses(user.id);
 
   const switcher = (
@@ -27,9 +27,11 @@ export default async function AdminLayout({ children, params }: { children: Reac
             {b.name} <span className="text-muted">· {b.city}</span>
           </Link>
         ))}
-        <Link href="/admin/new" className="block border-t border-line px-3 py-2 text-sm text-tomato hover:bg-paper">
-          + Add a business
-        </Link>
+        {asAdmin && (
+          <Link href="/superadmin/new" className="block border-t border-line px-3 py-2 text-sm text-tomato hover:bg-paper">
+            + Add a business
+          </Link>
+        )}
       </div>
     </details>
   );
@@ -42,18 +44,13 @@ export default async function AdminLayout({ children, params }: { children: Reac
             Smart<span className="text-tomato">Feedback</span>
           </Link>
           <div className="min-w-0 flex-1 lg:mt-6">{switcher}</div>
-          <Nav slug={slug} superAdmin={isSuperAdmin(user)} />
+          <Nav slug={slug} />
         </div>
         <div className="hidden lg:mt-auto lg:block">
           <a href={`/r/${slug}`} target="_blank" className="block rounded-xl border border-ink px-3 py-2 text-center text-sm transition hover:bg-ink hover:text-paper">
             Customer page ↗
           </a>
           <div className="dashed my-4" />
-          {isSuperAdmin(user) && (
-            <Link href="/superadmin" className="mb-3 block rounded-xl bg-ink px-3 py-2 text-center text-sm text-paper transition hover:opacity-90">
-              Super admin
-            </Link>
-          )}
           <p className="truncate text-xs text-muted" title={user.email}>
             {user.email}
           </p>
@@ -63,22 +60,22 @@ export default async function AdminLayout({ children, params }: { children: Reac
         </div>
       </aside>
       <div className="min-w-0">
-        {readOnly && (
+        {asAdmin && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-mustard bg-card px-4 py-2.5 text-sm sm:px-8">
             <span>
-              <span className="font-medium">Super-admin view.</span> You&apos;re looking at {business.name}&apos;s desk. Nothing can be changed here.
+              <span className="font-medium">Main admin view.</span> You&apos;re managing {business.name}&apos;s desk. Changes you save apply to their business.
             </span>
-            <Link href={`/superadmin/${slug}`} className="underline underline-offset-4">
+            <Link href={`/superadmin/${slug}`} className="rounded-full bg-ink px-3 py-1 text-paper">
               Manage this business →
             </Link>
           </div>
         )}
-        {!readOnly && !business.suspended && business.plan && (planState(business).tone === "warn" || planState(business).tone === "bad") && (
+        {!asAdmin && !business.suspended && business.plan && (planState(business).tone === "warn" || planState(business).tone === "bad") && (
           <Link href={`/admin/${slug}/billing`} className="block border-b border-mustard bg-card px-4 py-2.5 text-sm hover:underline sm:px-8">
             <span className="font-medium">Plan: {planState(business).label}.</span> {business.planCancelledAt ? "It won't renew." : "Renew it to keep your desk running."} →
           </Link>
         )}
-        {business.suspended && !readOnly ? (
+        {business.suspended && !asAdmin ? (
           <div className="mx-auto max-w-xl px-4 py-16 text-center">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-plum">Account paused</p>
             <h1 className="mt-3 font-display text-4xl tracking-tight">{business.name} is suspended</h1>

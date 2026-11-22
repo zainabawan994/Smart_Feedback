@@ -126,7 +126,7 @@ const toRow = (b: Partial<Business>) => {
 /* ---------------- Local JSON file (default for development) ---------------- */
 
 // shortcut: single JSON file, no concurrency control. Fine for a demo; set SUPABASE_* for anything real.
-const FILE = path.join(process.cwd(), "data", "db.json");
+const FILE = path.resolve(process.cwd(), process.env.DATA_FILE || path.join("data", "db.json")); // demo mode uses its own file
 type DB = { businesses: Record<string, Business>; events: Record<string, Event[]>; users: Record<string, User>; drafts: Record<string, Draft[]>; codes: Record<string, Code>; insights: Record<string, Insight>; logins: Record<string, LoginAttempts>; payments: Payment[] };
 
 const seed: Business = {
@@ -146,6 +146,8 @@ const seed: Business = {
 
 // Demo owner for the seeded café. Test-only credentials, also listed in README.
 export const DEMO_OWNER = { email: "owner@chaikhana.test", password: "chai-demo-2026" };
+// Dummy main admin, created only in demo mode (npm run dev:demo). Test-only credentials, also listed in README.
+export const DEMO_ADMIN = { email: "admin@smartfeedback.test", password: "admin-demo-2026" };
 
 async function load(): Promise<DB> {
   let db: DB;
@@ -171,6 +173,11 @@ async function load(): Promise<DB> {
     const id = randomUUID();
     db.users[id] = { id, email: DEMO_OWNER.email, passwordHash: hashPassword(DEMO_OWNER.password), createdAt: new Date().toISOString(), emailVerified: true, sessionVersion: 1 };
     demo.ownerId = id;
+    await save(db);
+  }
+  if (process.env.DEMO_MODE === "1" && !Object.values(db.users).some((u) => u.email === DEMO_ADMIN.email)) {
+    const id = randomUUID();
+    db.users[id] = { id, email: DEMO_ADMIN.email, passwordHash: hashPassword(DEMO_ADMIN.password), createdAt: new Date().toISOString(), emailVerified: true, sessionVersion: 1 };
     await save(db);
   }
   return db;
@@ -488,6 +495,19 @@ export async function updateBusiness(slug: string, patch: Partial<Business>) {
   const db = await load();
   if (!db.businesses[slug]) return null;
   db.businesses[slug] = { ...db.businesses[slug], ...patch, slug, ownerId: db.businesses[slug].ownerId };
+  await save(db);
+  return db.businesses[slug];
+}
+
+/** Super admin: give this business to another owner (the old owner loses access). */
+export async function setBusinessOwner(slug: string, ownerId: string) {
+  if (useSupabase) {
+    const rows: Row[] = await sb(`businesses?slug=eq.${encodeURIComponent(slug)}`, { method: "PATCH", body: JSON.stringify({ owner_id: ownerId }) });
+    return rows[0] ? fromRow(rows[0]) : null;
+  }
+  const db = await load();
+  if (!db.businesses[slug]) return null;
+  db.businesses[slug].ownerId = ownerId;
   await save(db);
   return db.businesses[slug];
 }
