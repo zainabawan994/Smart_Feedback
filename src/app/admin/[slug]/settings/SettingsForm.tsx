@@ -68,52 +68,9 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
   return (
     <form onSubmit={save} className="mt-8 grid gap-6">
       <section className={section}>
-        <h2 className="font-display text-2xl">Business profile</h2>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <Field label="Business name">
-            <input className={inputCls} value={b.name} maxLength={80} onChange={(e) => setB({ ...b, name: e.target.value })} required />
-          </Field>
-          <Field label="City">
-            <input className={inputCls} value={b.city} maxLength={60} onChange={(e) => setB({ ...b, city: e.target.value })} required />
-          </Field>
-          <Field label="Google review link" hint="Business Profile → Ask for reviews, or your Place ID">
-            <input className={inputCls} value={b.googleReviewUrl} onChange={(e) => setB({ ...b, googleReviewUrl: e.target.value })} placeholder="https://g.page/r/…/review" />
-          </Field>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Type">
-              <select className={inputCls} value={typeOf(b.kind).noun} onChange={(e) => { const t = typeOf(e.target.value); setB({ ...b, kind: e.target.value }); setHl({ positive: t.highlights.positive.join("\n"), neutral: t.highlights.neutral.join("\n"), negative: t.highlights.negative.join("\n") }); }}>
-                {BUSINESS_TYPES.map((t) => (
-                  <option key={t.key} value={t.noun}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Default language">
-              <select className={inputCls} value={b.defaultLang} onChange={(e) => setB({ ...b, defaultLang: e.target.value as Business["defaultLang"] })}>
-                <option value="en">English</option>
-                <option value="roman">Roman Urdu</option>
-                <option value="ur">اردو</option>
-              </select>
-            </Field>
-          </div>
-        </div>
-      </section>
-
-      <section className={section}>
-        <h2 className="font-display text-2xl">{type.items.title}</h2>
-        <p className="mt-1 text-sm text-muted">Customers see &quot;{type.items.question}&quot; and can tap these. Exact names in reviews help people find you on Google and AI search.</p>
-        <div className="mt-4 max-w-md">
-          <Field label={type.items.title} hint="one per line, up to 20">
-            <textarea className={`${inputCls} font-mono text-sm`} rows={8} value={menu} onChange={(e) => setMenu(e.target.value)} placeholder={type.items.placeholder} />
-          </Field>
-        </div>
-      </section>
-
-      <section className={section}>
-        <h2 className="font-display text-2xl">Your own questions</h2>
+        <h2 className="font-display text-2xl">Your review form</h2>
         <p className="mt-1 text-sm text-muted">
-          Ask about anything, like &quot;How was the food?&quot; with Excellent / Good / Okay / Poor. Customers tap one answer and the review mentions it. Up to {QUESTIONS_MAX} questions,{" "}
+          These are the questions customers answer on your review page. Ask about anything, like &quot;How was the food?&quot; with Excellent / Good / Okay / Poor. Customers tap one answer and the review mentions it. Up to {QUESTIONS_MAX} questions,{" "}
           {QUESTION_OPTIONS_MAX} answers each.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -144,6 +101,49 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
             + Add a question
           </button>
         )}
+      </section>
+
+      <section className={section}>
+        <h2 className="font-display text-2xl">{type.items.title}</h2>
+        <p className="mt-1 text-sm text-muted">Customers see &quot;{type.items.question}&quot; and can tap these. Exact names in reviews help people find you on Google and AI search.</p>
+        <div className="mt-4 max-w-md">
+          <Field label={type.items.title} hint="one per line, up to 20">
+            <textarea className={`${inputCls} font-mono text-sm`} rows={8} value={menu} onChange={(e) => setMenu(e.target.value)} placeholder={type.items.placeholder} />
+          </Field>
+        </div>
+      </section>
+
+      <section className={section}>
+        <h2 className="font-display text-2xl">Business profile</h2>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <Field label="Business name">
+            <input className={inputCls} value={b.name} maxLength={80} onChange={(e) => setB({ ...b, name: e.target.value })} required />
+          </Field>
+          <Field label="City">
+            <input className={inputCls} value={b.city} maxLength={60} onChange={(e) => setB({ ...b, city: e.target.value })} required />
+          </Field>
+          <Field label="Google review link" hint="Business Profile → Ask for reviews, or your Place ID">
+            <input className={inputCls} value={b.googleReviewUrl} onChange={(e) => setB({ ...b, googleReviewUrl: e.target.value })} placeholder="https://g.page/r/…/review" />
+          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Type">
+              <select className={inputCls} value={typeOf(b.kind).noun} onChange={(e) => { const t = typeOf(e.target.value); setB({ ...b, kind: e.target.value }); setHl({ positive: t.highlights.positive.join("\n"), neutral: t.highlights.neutral.join("\n"), negative: t.highlights.negative.join("\n") }); }}>
+                {BUSINESS_TYPES.map((t) => (
+                  <option key={t.key} value={t.noun}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Default language">
+              <select className={inputCls} value={b.defaultLang} onChange={(e) => setB({ ...b, defaultLang: e.target.value as Business["defaultLang"] })}>
+                <option value="en">English</option>
+                <option value="roman">Roman Urdu</option>
+                <option value="ur">اردو</option>
+              </select>
+            </Field>
+          </div>
+        </div>
       </section>
 
       <div className="sticky bottom-0 -mx-4 flex items-center gap-4 border-t border-line bg-paper/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border">

@@ -13,7 +13,7 @@ export default async function SettingsPage({ params, searchParams }: { params: P
         <div className="mt-6 rounded-2xl border border-leaf bg-card p-5">
           <p className="font-display text-xl">Welcome! Your desk is ready.</p>
           <p className="mt-1 text-sm text-muted">
-            Three things before you print the QR: paste your Google review link, add your menu, and check the options below. We added starter options you can change.
+            Before you share your QR code: add your questions, list what you offer, and paste your Google review link.
           </p>
         </div>
       )}

@@ -39,13 +39,13 @@ export default function QrCard({ name, slug, url }: { name: string; slug: string
       <div className="grid min-w-0 grid-cols-1 gap-4">
         <div className="rounded-2xl border border-line bg-card p-5">
           <h2 className="font-display text-2xl">Print or share</h2>
-          <p className="mt-1 text-sm text-muted">The PNG is high resolution (512px), sharp enough for table tents, menus and posters.</p>
+          <p className="mt-1 text-sm text-muted">The PNG is high resolution (512px), sharp enough for stands, counters and posters.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <button onClick={download} className="rounded-full bg-tomato px-4 py-3 font-medium text-tomato-ink transition hover:brightness-110">
               Download QR (PNG)
             </button>
             <button onClick={() => window.print()} className="rounded-full border border-ink px-4 py-3 font-medium transition hover:bg-ink hover:text-paper">
-              Print table card
+              Print QR card
             </button>
           </div>
           <div className="dashed my-5" />
@@ -57,15 +57,6 @@ export default function QrCard({ name, slug, url }: { name: string; slug: string
             </button>
           </div>
           <p className="mt-2 text-xs text-muted">Share it on WhatsApp, receipts or Instagram bio too.</p>
-        </div>
-
-        <div className="rounded-2xl border border-line bg-card p-5 text-sm">
-          <h2 className="font-display text-xl">Placement tips</h2>
-          <ul className="mt-3 grid gap-2 text-muted">
-            <li>• Put a card on every table and at the counter, where people wait for the bill.</li>
-            <li>• Staff can mention it when they bring the bill: &quot;If you have a minute, tell us how it was.&quot;</li>
-            <li>• Ask every customer, happy or not. Offering rewards for reviews, or only asking happy customers, breaks Google&apos;s rules.</li>
-          </ul>
         </div>
       </div>
 
