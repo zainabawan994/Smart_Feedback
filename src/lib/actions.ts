@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
-import { createBusiness, createPayment, createUser, getBusiness, getPayment, getUserByEmail, getUserById, setBusinessOwner, setPaymentStatus, updateBusiness, updateUser } from "./store";
+import { createBusiness, createPayment, createUser, deleteBusiness, getBusiness, getPayment, getUserByEmail, getUserById, setBusinessOwner, setPaymentStatus, updateBusiness, updateUser } from "./store";
 import { paymentAccounts } from "./billing.ts";
 import { hashPassword, verifyPassword } from "./password.ts";
 import { typeOf } from "./business-types.ts";
@@ -370,4 +370,15 @@ export async function superAdminOwnerAccount(_: FormState, f: FormData): Promise
   await updateUser(owner.id, patch);
   revalidatePath("/superadmin");
   return { info: patch.passwordHash ? `Password changed for ${owner.email}. Share it with them privately.` : `${owner.email} marked verified.` };
+}
+
+/** Super admin: permanently delete a business. The admin must type the business's slug to confirm. */
+export async function superAdminDeleteBusiness(_: FormState, f: FormData): Promise<FormState> {
+  if (!isSuperAdmin(await currentUser())) return { error: "Not allowed." };
+  const slug = str(f, "slug", 40);
+  if (!(await getBusiness(slug))) return { error: "Business not found." };
+  if (str(f, "confirm", 40) !== slug) return { error: `Type ${slug} exactly to confirm.` };
+  if (!(await deleteBusiness(slug))) return { error: "Could not delete this business." };
+  revalidatePath("/superadmin");
+  redirect("/superadmin?deleted=1");
 }

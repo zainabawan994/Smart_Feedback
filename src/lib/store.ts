@@ -499,6 +499,24 @@ export async function updateBusiness(slug: string, patch: Partial<Business>) {
   return db.businesses[slug];
 }
 
+/** Super admin: delete a business and everything tied to it (events, drafts, insights, payments). Cannot be undone. */
+export async function deleteBusiness(slug: string): Promise<boolean> {
+  if (useSupabase) {
+    // events, drafts, insights and payments go with it: their foreign keys are "on delete cascade".
+    const rows: Row[] = await sb(`businesses?slug=eq.${encodeURIComponent(slug)}`, { method: "DELETE" });
+    return rows.length > 0;
+  }
+  const db = await load();
+  if (!db.businesses[slug]) return false;
+  delete db.businesses[slug];
+  delete db.events[slug];
+  delete db.drafts[slug];
+  delete db.insights[slug];
+  db.payments = db.payments.filter((p) => p.slug !== slug);
+  await save(db);
+  return true;
+}
+
 /** Super admin: give this business to another owner (the old owner loses access). */
 export async function setBusinessOwner(slug: string, ownerId: string) {
   if (useSupabase) {

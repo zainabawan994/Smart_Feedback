@@ -6,7 +6,8 @@ import { PageHeader, card, day, eyebrow, when } from "../admin/[slug]/ui";
 import { PAYMENT_METHODS, planLabel, planState, rupees } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "./ui";
 
-export default async function SuperAdmin() {
+export default async function SuperAdmin({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
+  const { deleted } = await searchParams;
   const user = await requireSuperAdmin();
   const [businesses, users, pending] = await Promise.all([listPlatformBusinesses(), listPlatformUsers(), listPayments({ status: "pending" })]);
   const nameOf = (slug: string) => businesses.find((b) => b.slug === slug)?.name ?? slug;
@@ -32,6 +33,8 @@ export default async function SuperAdmin() {
           </Link>
         </PageHeader>
       </div>
+
+      {deleted && <p className="mt-6 rounded-lg border border-leaf/50 px-3 py-2 text-sm text-leaf" role="status">Business deleted.</p>}
 
       <section className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4 lg:grid-cols-8" aria-label="Totals">
         {totals.map((t) => (

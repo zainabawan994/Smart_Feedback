@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/auth";
-import { decidePaymentAction, superAdminOwnerAccount, superAdminSetOwner, superAdminUpdateBusiness } from "@/lib/actions";
+import { decidePaymentAction, superAdminDeleteBusiness, superAdminOwnerAccount, superAdminSetOwner, superAdminUpdateBusiness } from "@/lib/actions";
 import { getStats, listPayments, listPlatformBusinesses } from "@/lib/store";
 import { ActionForm, Field, inputCls } from "@/components/forms";
 import { PageHeader, card, day, eyebrow, when } from "../../admin/[slug]/ui";
@@ -201,6 +201,19 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
             ))}
           </ul>
         )}
+      </section>
+
+      <section className={`${card} mt-6 border-plum`}>
+        <h2 className="font-display text-2xl text-plum">Delete business</h2>
+        <p className="mt-1 text-sm text-muted">
+          Removes {b.name}, its customer page, QR scans, drafts, insights and payment records for good. This cannot be undone. The owner&apos;s account stays; to pause instead, tick Suspended above.
+        </p>
+        <div className="mt-4 max-w-md">
+          <ActionForm action={superAdminDeleteBusiness} submit="Delete this business forever">
+            <input type="hidden" name="slug" value={b.slug} />
+            <Field label={`Type ${b.slug} to confirm`} name="confirm" autoComplete="off" required />
+          </ActionForm>
+        </div>
       </section>
     </main>
   );
