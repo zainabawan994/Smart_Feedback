@@ -44,10 +44,12 @@ export async function currentUser(): Promise<User | null> {
   return user?.emailVerified ? user : null;
 }
 
-/** The one main admin: the verified account whose email is SUPER_ADMIN_EMAILS (only the first entry counts). */
+/** Admin emails from SUPER_ADMIN_EMAILS (comma-separated). Only the hosting settings can add one, never the app. */
+export const adminEmails = () => (process.env.SUPER_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+
+/** Main admins (the team): verified accounts whose email is listed in SUPER_ADMIN_EMAILS. */
 export function isSuperAdmin(user: Pick<User, "email" | "emailVerified"> | null) {
-  const admin = (process.env.SUPER_ADMIN_EMAILS ?? "").split(",")[0].trim().toLowerCase();
-  return Boolean(admin && user?.emailVerified && user.email.toLowerCase() === admin);
+  return Boolean(user?.emailVerified && adminEmails().includes(user.email.toLowerCase()));
 }
 
 /** For super-admin pages. Everyone else gets a 404, so the page doesn't reveal it exists. */

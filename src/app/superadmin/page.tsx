@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { requireSuperAdmin } from "@/lib/auth";
-import { decidePaymentAction } from "@/lib/actions";
-import { blockedReviewCounts, listPayments, listPlatformBusinesses, listPlatformUsers } from "@/lib/store";
+import { adminEmails, requireSuperAdmin } from "@/lib/auth";
+import { decidePaymentAction, superAdminSetupAdmin } from "@/lib/actions";
+import { blockedReviewCounts, getUserByEmail, listPayments, listPlatformBusinesses, listPlatformUsers } from "@/lib/store";
+import { ActionForm, Field } from "@/components/forms";
 import { PageHeader, card, day, eyebrow, when } from "../admin/[slug]/ui";
 import { PAYMENT_METHODS, planLabel, planState, rupees } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "./ui";
@@ -10,6 +11,7 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
   const { deleted } = await searchParams;
   const user = await requireSuperAdmin();
   const [businesses, users, pending, blockedBy] = await Promise.all([listPlatformBusinesses(), listPlatformUsers(), listPayments({ status: "pending" }), blockedReviewCounts()]);
+  const team = await Promise.all(adminEmails().map(async (email) => ({ email, user: await getUserByEmail(email) })));
   const nameOf = (slug: string) => businesses.find((b) => b.slug === slug)?.name ?? slug;
   const states = businesses.map((b) => planState(b));
   const totals = [
@@ -131,6 +133,32 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section className={`${card} mt-6`} aria-label="Team admins">
+        <h2 className="font-display text-2xl">Team admins</h2>
+        <p className="mt-1 text-sm text-muted">
+          Everyone here has full admin access. To add a teammate: put their email in <span className="font-mono text-ink">SUPER_ADMIN_EMAILS</span> in the hosting settings
+          (Vercel → Settings → Environment Variables, emails separated by commas), redeploy, then set their password here.
+        </p>
+        <ul className="mt-4 grid gap-3 md:grid-cols-2">
+          {team.map(({ email, user: u }) => (
+            <li key={email} className="rounded-xl border border-line bg-paper p-4">
+              <p className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="font-medium">{email}</span>
+                <span className={u ? "text-leaf" : "text-tomato"}>{u ? (email === user.email.toLowerCase() ? "✓ you" : "✓ has an account") : "no account yet"}</span>
+              </p>
+              {email !== user.email.toLowerCase() && (
+                <div className="mt-3">
+                  <ActionForm action={superAdminSetupAdmin} submit={u ? "Reset password" : "Create account"}>
+                    <input type="hidden" name="email" value={email} />
+                    <Field label={u ? "New password" : "Password"} hint="8+ characters" name="password" type="password" autoComplete="new-password" minLength={8} required />
+                  </ActionForm>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className={`${card} mt-6 p-0`}>

@@ -9,6 +9,7 @@ const env = {
   SUPABASE_URL: "",
   SUPABASE_SERVICE_ROLE_KEY: "",
   SMTP_HOST: "",
-  SUPER_ADMIN_EMAILS: "admin@smartfeedback.test", // keep in sync with DEMO_ADMIN in src/lib/store.ts
+  // keep the first in sync with DEMO_ADMIN in src/lib/store.ts; the teammate gets a password from Team admins
+  SUPER_ADMIN_EMAILS: "admin@smartfeedback.test,teammate@smartfeedback.test",
 };
 spawn("npx next dev -p 3011", { env, stdio: "inherit", shell: true }).on("exit", (code) => process.exit(code ?? 0));

@@ -3,7 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
+import { adminEmails, clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
 import { createBusiness, createPayment, createUser, deleteBusiness, getBusiness, getPayment, getUserByEmail, getUserById, setBusinessOwner, setPaymentStatus, updateBusiness, updateUser } from "./store";
 import { paymentAccounts } from "./billing.ts";
@@ -381,4 +381,20 @@ export async function superAdminDeleteBusiness(_: FormState, f: FormData): Promi
   if (!(await deleteBusiness(slug))) return { error: "Could not delete this business." };
   revalidatePath("/superadmin");
   redirect("/superadmin?deleted=1");
+}
+
+/** Admin: set the password for a team admin (an email listed in SUPER_ADMIN_EMAILS). Creates the account if it
+ *  doesn't exist yet and marks it verified, so the teammate can log in from any phone straight away. */
+export async function superAdminSetupAdmin(_: FormState, f: FormData): Promise<FormState> {
+  if (!isSuperAdmin(await currentUser())) return { error: "Not allowed." };
+  const email = str(f, "email").toLowerCase();
+  if (!adminEmails().includes(email)) return { error: "That email isn't in SUPER_ADMIN_EMAILS on the hosting settings." };
+  const pw = newPassword(f);
+  if ("error" in pw) return pw;
+  const existing = await getUserByEmail(email);
+  const user = existing ?? (await createUser(email, pw.password));
+  if (!user) return { error: "Could not create that account." };
+  await updateUser(user.id, existing ? { passwordHash: hashPassword(pw.password), emailVerified: true } : { emailVerified: true });
+  revalidatePath("/superadmin");
+  return { info: `${email} can now log in at /superadmin/login with this password. Share it privately.` };
 }
