@@ -142,3 +142,15 @@ export function typeOf(kind: string | null | undefined): BusinessType {
     BUSINESS_TYPES.find((t) => t.key === "service")!
   );
 }
+
+/** What to save as a business's type: a known type's noun, or for "Other service" the owner's own words
+ *  (e.g. "gym", "car wash"), cleaned and short because they go into the review prompt. */
+export function normalizeKind(kind: string): string {
+  const t = typeOf(kind);
+  if (t.key !== "service") return t.noun;
+  const own = kind.replace(/[^\p{L}\p{N} &'\-/]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 40).toLowerCase();
+  return own && own !== t.label.toLowerCase() && own !== t.key ? own : t.noun;
+}
+
+/** True when a saved type is "Other service" (a preset noun or the owner's own words). */
+export const isOtherKind = (kind: string | null | undefined) => typeOf(kind).key === "service";

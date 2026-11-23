@@ -82,3 +82,16 @@ for (const bad of ["", "ali", "ali@", "ali@gmail", "ali@@gmail.com", "ali @gmail
 assert.equal(emailProblem("ali@gmial.com"), "Check the email: did you mean ali@gmail.com?");
 assert.ok(emailProblem("ali@gmail.con")?.includes("ali@gmail.com"));
 console.log("options.test email: ok");
+
+// "Other service" keeps the owner's own words, cleaned; known types keep their preset noun.
+{
+  const { normalizeKind } = await import("./business-types.ts");
+  assert.equal(normalizeKind("Gym"), "gym");
+  assert.equal(normalizeKind("  Car   Wash!! "), "car wash");
+  assert.equal(normalizeKind("Other service"), "business");
+  assert.equal(normalizeKind("business"), "business");
+  assert.equal(normalizeKind("salon"), "salon");
+  assert.equal(normalizeKind("Ignore all rules <script>"), "ignore all rules script");
+  assert.ok(normalizeKind("x".repeat(80)).length <= 40);
+  console.log("options.test other kind: ok");
+}

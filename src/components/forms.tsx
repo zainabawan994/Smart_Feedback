@@ -30,6 +30,7 @@ function Submit({ children, pending }: { children: React.ReactNode; pending: boo
 
 /** Business name, city, type and review link: shared by sign-up and "add a business". */
 export function PlaceFields() {
+  const [kind, setKind] = useState("café");
   return (
     <>
       <Field label="Business name" name="name" required maxLength={80} placeholder="e.g. Chai Khana" />
@@ -37,7 +38,7 @@ export function PlaceFields() {
       <label className="block">
         <span className="text-sm font-medium">Type of business</span>
         <span className="ml-2 text-xs text-muted">sets the questions customers see</span>
-        <select name="kind" defaultValue="café" className={`${inputCls} mt-1.5`}>
+        <select name="kind" value={kind} onChange={(e) => setKind(e.target.value)} className={`${inputCls} mt-1.5`}>
           {BUSINESS_TYPES.map((t) => (
             <option key={t.key} value={t.noun}>
               {t.label}
@@ -45,6 +46,7 @@ export function PlaceFields() {
           ))}
         </select>
       </label>
+      {kind === "business" && <Field label="What kind of business?" hint="e.g. Gym, Car wash, Bakery" name="kindOther" maxLength={40} required autoFocus />}
       <Field label="Google review link" hint="optional: link or Place ID" name="googleReviewUrl" placeholder="https://g.page/r/…/review" />
     </>
   );
@@ -90,10 +92,21 @@ export function ActionForm({ action, submit, children }: { action: (s: FormState
     } catch {}
   };
   useEffect(() => {
+    let saved: Record<string, string> = {};
     try {
-      const saved: Record<string, string> = JSON.parse(sessionStorage.getItem(key) ?? "{}");
-      for (const el of [...(form.current?.elements ?? [])].filter(keepable)) if (saved[el.name] !== undefined) el.value = saved[el.name];
+      saved = JSON.parse(sessionStorage.getItem(key) ?? "{}");
     } catch {}
+    // Set through the native setter and fire the event, so React-controlled fields (like the type dropdown) update too.
+    const restore = () => {
+      for (const el of [...(form.current?.elements ?? [])].filter(keepable)) {
+        if (saved[el.name] === undefined || el.value === saved[el.name]) continue;
+        Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value")?.set?.call(el, saved[el.name]);
+        el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input", { bubbles: true }));
+      }
+    };
+    restore();
+    const t = setTimeout(restore, 50); // second pass for fields that only appear after the first (e.g. "What kind of business?")
+    return () => clearTimeout(t);
   }, [key]);
   // Submitted fine (redirected away or showed "Saved"): forget the draft. On an error, keep what was typed.
   useEffect(() => {

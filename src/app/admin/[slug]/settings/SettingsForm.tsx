@@ -5,7 +5,7 @@ import { useDraft } from "@/components/forms";
 import { useRouter } from "next/navigation";
 import type { Business } from "@/lib/store";
 import { inputCls } from "@/components/forms";
-import { BUSINESS_TYPES, typeOf } from "@/lib/business-types";
+import { BUSINESS_TYPES, isOtherKind, typeOf } from "@/lib/business-types";
 import { QUESTIONS_MAX, QUESTION_OPTIONS_MAX } from "@/lib/options";
 
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
@@ -135,6 +135,17 @@ export default function SettingsForm({ initial, readOnly = false }: { initial: B
                 ))}
               </select>
             </Field>
+            {isOtherKind(b.kind) && (
+              <Field label="What kind of business?" hint="e.g. Gym, Car wash">
+                <input
+                  className={inputCls}
+                  value={b.kind === "business" ? "" : b.kind}
+                  maxLength={40}
+                  placeholder="Gym"
+                  onChange={(e) => setB({ ...b, kind: e.target.value.trim() ? e.target.value : "business" })}
+                />
+              </Field>
+            )}
             <Field label="Default language">
               <select className={inputCls} value={b.defaultLang} onChange={(e) => setB({ ...b, defaultLang: e.target.value as Business["defaultLang"] })}>
                 <option value="en">English</option>
