@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSuperAdmin } from "@/lib/auth";
 import { decidePaymentAction, superAdminDeleteBusiness, superAdminOwnerAccount, superAdminSetOwner, superAdminUpdateBusiness } from "@/lib/actions";
-import { getStats, listPayments, listPlatformBusinesses } from "@/lib/store";
+import { blockedReviewCounts, getStats, listPayments, listPlatformBusinesses } from "@/lib/store";
 import { ActionForm, Field, inputCls } from "@/components/forms";
 import { PageHeader, card, day, eyebrow, when } from "../../admin/[slug]/ui";
 import { PAYMENT_METHODS, PLANS, TIME_ZONE, planLabel, planState, rupees } from "@/lib/options";
@@ -13,7 +13,7 @@ const dateInput = (iso: string) => new Intl.DateTimeFormat("en-CA", { timeZone: 
 export default async function ManageBusiness({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const user = await requireSuperAdmin();
-  const [all, stats, payments] = await Promise.all([listPlatformBusinesses(), getStats(slug), listPayments({ slug }, 20)]);
+  const [all, stats, payments, blockedBy] = await Promise.all([listPlatformBusinesses(), getStats(slug), listPayments({ slug }, 20), blockedReviewCounts()]);
   const b = all.find((x) => x.slug === slug);
   if (!b) notFound();
   const c = stats.counts;
@@ -25,6 +25,7 @@ export default async function ManageBusiness({ params }: { params: Promise<{ slu
     ["Last activity", b.lastActivity ? when(b.lastActivity) : "never"],
     ["Google link", b.googleReviewUrl && !b.googleReviewUrl.includes("REPLACE_WITH") ? "set" : "missing"],
     ["Menu items", String(b.menu.length)],
+    ["Blocked review tries (7 days)", String(blockedBy[slug] ?? 0)],
   ];
 
   return (

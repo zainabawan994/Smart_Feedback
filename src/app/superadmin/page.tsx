@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/auth";
 import { decidePaymentAction } from "@/lib/actions";
-import { listPayments, listPlatformBusinesses, listPlatformUsers } from "@/lib/store";
+import { blockedReviewCounts, listPayments, listPlatformBusinesses, listPlatformUsers } from "@/lib/store";
 import { PageHeader, card, day, eyebrow, when } from "../admin/[slug]/ui";
 import { PAYMENT_METHODS, planLabel, planState, rupees } from "@/lib/options";
 import { StateBadge, TopBar, shell } from "./ui";
@@ -9,7 +9,7 @@ import { StateBadge, TopBar, shell } from "./ui";
 export default async function SuperAdmin({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   const { deleted } = await searchParams;
   const user = await requireSuperAdmin();
-  const [businesses, users, pending] = await Promise.all([listPlatformBusinesses(), listPlatformUsers(), listPayments({ status: "pending" })]);
+  const [businesses, users, pending, blockedBy] = await Promise.all([listPlatformBusinesses(), listPlatformUsers(), listPayments({ status: "pending" }), blockedReviewCounts()]);
   const nameOf = (slug: string) => businesses.find((b) => b.slug === slug)?.name ?? slug;
   const states = businesses.map((b) => planState(b));
   const totals = [
@@ -106,6 +106,11 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
                     <span className="block text-xs text-muted">
                       {b.city} · {b.slug}
                     </span>
+                    {blockedBy[b.slug] > 0 && (
+                      <span className="mt-1 inline-block rounded-full bg-plum px-2 py-0.5 text-xs text-paper" title="Reviews blocked because one phone or network tried too many times">
+                        ⚠ {blockedBy[b.slug]} blocked review {blockedBy[b.slug] === 1 ? "try" : "tries"} this week
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-3">{b.ownerEmail ?? <span className="text-muted">no owner</span>}</td>
                   <td className="px-3 py-3">

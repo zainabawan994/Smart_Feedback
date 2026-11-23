@@ -3,6 +3,15 @@ import { draftReview } from "@/lib/review";
 import { LANGS, NOTE_MAX, PHOTO_MAX_CHARS, validAnswers } from "@/lib/options";
 import { typeOf } from "@/lib/business-types";
 import { allow, clientIp, tooMany } from "@/lib/guard";
+import { sessionUser } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { randomUUID } from "crypto";
+
+const DAY = 86_400;
+const DEVICE_PER_DAY = 3; // one review per phone per day, with room to tap "Write it again" twice
+const NETWORK_PER_DAY = 10; // per business: customers often share the shop's Wi-Fi, so not lower
+const blocked = (slug: string, error: string) =>
+  allow("flag", slug, 1e9, 7 * DAY).then(() => Response.json({ error, blocked: true }, { status: 429 })); // counted for the admin's warning
 
 const SENTIMENTS: Sentiment[] = ["positive", "neutral", "negative"];
 const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
@@ -41,6 +50,20 @@ export async function POST(req: Request) {
     photo = body.photo;
   }
   if (!picks.length && !items.length && !answers.length && !note && !photo) return Response.json({ error: "Pick something or write a few words" }, { status: 400 });
+
+  // Anti-fake: the owner can't write reviews for their own business, and one phone / one network can't make many.
+  const user = await sessionUser();
+  if (user && user.id === b.ownerId) return Response.json({ error: "Owner preview: reviews can't be written while you're logged in as the owner." }, { status: 403 });
+  const jar = await cookies();
+  let device = jar.get("sf_dev")?.value ?? "";
+  if (!/^[0-9a-f-]{36}$/.test(device)) {
+    device = randomUUID();
+    jar.set("sf_dev", device, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 400 * DAY });
+  }
+  if (!(await allow("review-device", `${b.slug}:${device}`, DEVICE_PER_DAY, DAY)))
+    return blocked(b.slug, `You've already written a review for ${b.name} today. Thank you!`);
+  if (!(await allow("review-network", `${b.slug}:${clientIp(req.headers)}`, NETWORK_PER_DAY, DAY)))
+    return blocked(b.slug, "Too many reviews from this network today. Please try again tomorrow, or switch to mobile data.");
 
   const result = await draftReview(b, { picks, items, sentiment, lang, occasions, note, photo, answers });
   const tags = [`lang:${lang}`, items.length && "dish", occasions.length && "occasion", photo && "photo", note && "note"].filter(Boolean) as string[];

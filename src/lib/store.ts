@@ -325,7 +325,9 @@ export async function putLoginAttempts(email: string, a: LoginAttempts | null) {
 /* ---- rate limits (abuse protection for public endpoints) ---- */
 
 // shortcut: JSON mode keeps counters in this process's memory; fine for local development only.
-const localHits = new Map<string, { n: number; reset: number }>();
+// On globalThis so API routes and pages (separate module copies in dev) share one set of counters.
+const hitsHolder = globalThis as unknown as { __sfHits?: Map<string, { n: number; reset: number }> };
+const localHits = (hitsHolder.__sfHits ??= new Map());
 
 /** Counts one hit for `key`; true while it is within `max` hits per `windowSec`. */
 export async function rateLimit(key: string, max: number, windowSec: number): Promise<boolean> {
@@ -343,6 +345,18 @@ export async function rateLimit(key: string, max: number, windowSec: number): Pr
   const next = !cur || cur.reset < now ? { n: 1, reset: now + windowSec * 1000 } : { n: cur.n + 1, reset: cur.reset };
   localHits.set(key, next);
   return next.n <= max;
+}
+
+/** Blocked review attempts per business over the last week ("flag:<slug>" counters), for the admin's warning. */
+export async function blockedReviewCounts(): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  if (useSupabase) {
+    const rows: { key: string; n: number; reset_at: string }[] = await sb("rate_limits?key=like.flag:*&select=key,n,reset_at").catch(() => []);
+    for (const r of rows) if (new Date(r.reset_at) > new Date()) out[r.key.slice(5)] = r.n;
+    return out;
+  }
+  for (const [key, v] of localHits) if (key.startsWith("flag:") && v.reset > Date.now()) out[key.slice(5)] = v.n;
+  return out;
 }
 
 /* ---- payments (manual transfers) ---- */

@@ -41,7 +41,7 @@ function Question({ n, title, hint, children }: { n: number; title: string; hint
 }
 
 /** One screen, up to four quick questions, then the AI review appears right below. */
-export default function Flow({ business: b }: { business: Business }) {
+export default function Flow({ business: b, ownerPreview = false }: { business: Business; ownerPreview?: boolean }) {
   const type = typeOf(b.kind); // what "items" means for this kind of business
   const [sentiment, setSentiment] = useDraft<Sentiment | null>(`review:${b.slug}:sentiment`, null);
   const [items, setItems] = useDraft<string[]>(`review:${b.slug}:items`, []);
@@ -180,6 +180,12 @@ export default function Flow({ business: b }: { business: Business }) {
         </div>
       </header>
 
+      {ownerPreview && (
+        <p className="mt-4 rounded-xl border border-mustard px-3 py-2 text-sm" role="status">
+          <span className="font-medium">Owner preview.</span> This is what customers see. Reviews can&apos;t be written while you&apos;re logged in as the owner.
+        </p>
+      )}
+
       <h1 className="mt-5 font-display text-[1.4rem] leading-tight tracking-tight sm:text-[1.9rem]" style={{ fontVariationSettings: "'SOFT' 100" }}>
         How was your visit to <em className="text-tomato">{b.name}</em>?
       </h1>
@@ -270,14 +276,14 @@ export default function Flow({ business: b }: { business: Business }) {
           <div className="mt-6 grid gap-2.5">
             <button
               onClick={quickPost}
-              disabled={!ready || busy}
+              disabled={!ready || busy || ownerPreview}
               className="w-full rounded-full bg-tomato px-5 py-4 text-lg font-semibold text-tomato-ink transition hover:brightness-110 disabled:opacity-40"
             >
               {busy ? "Writing your review…" : "Write & post on Google"}
             </button>
             <button
               onClick={generate}
-              disabled={!ready || busy}
+              disabled={!ready || busy || ownerPreview}
               className="w-full rounded-full border-2 border-ink px-5 py-3 text-base font-semibold transition hover:bg-ink hover:text-paper disabled:opacity-40"
             >
               {draft ? "Write it again" : "Write & check it first"}
