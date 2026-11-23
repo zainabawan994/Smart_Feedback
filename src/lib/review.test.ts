@@ -6,22 +6,34 @@ assert.equal(scrub("Overall, a truly delightful spot — a testament to good cha
 assert.equal(scrub("Great food! Great staff!"), "Great food! Great staff.");
 
 const b = { slug: "x", name: "Chai Khana", city: "Lahore", kind: "café", googleReviewUrl: "", menu: [], highlights: { positive: [], neutral: [], negative: [] }, defaultLang: "en" as const };
-const neg = templateDraft(b, { picks: ["Long wait"], items: [], sentiment: "negative", lang: "en" });
+const neg = templateDraft(b, { picks: ["Long wait"], items: [], sentiment: "negative", lang: "en" }, () => 0);
 assert.match(neg, /didn't go well.*Long wait/);
-assert.ok(templateDraft(b, { picks: ["کھانا ٹھنڈا تھا"], items: [], sentiment: "negative", lang: "ur" }).includes("اچھا نہیں"));
+assert.ok(templateDraft(b, { picks: ["کھانا ٹھنڈا تھا"], items: [], sentiment: "negative", lang: "ur" }, () => 0).includes("اچھا نہیں"));
 
 assert.equal(acceptNormalized("Food was cold and the wait was long.", "Loved it! Amazing food, cold but great.", "negative"), false);
 assert.equal(acceptNormalized("Food was cold and the wait was long.", "Food came cold, waited a long time.", "negative"), true);
 assert.equal(acceptNormalized("Food was cold and the wait was long.", "", "neutral"), false);
 console.log("review.test: ok");
 
-const roman = templateDraft(b, { picks: ["Long wait"], items: ["Zinger roll"], sentiment: "negative", lang: "roman", occasions: ["Dinner"], note: "dobara nahi aaunga!" });
+const roman = templateDraft(b, { picks: ["Long wait"], items: ["Zinger roll"], sentiment: "negative", lang: "roman", occasions: ["Dinner"], note: "dobara nahi aaunga!" }, () => 0);
 assert.equal(roman, "Lahore mein Chai Khana ka tajurba acha nahi raha. Dinner ke liye aaya tha. Maine Zinger roll liya. Long wait. Dobara nahi aaunga. Umeed hai ye behtar karenge.");
-const both = templateDraft(b, { picks: ["Quick service"], items: [], sentiment: "neutral", lang: "en", occasions: ["Dinner", "With friends"] });
+const both = templateDraft(b, { picks: ["Quick service"], items: [], sentiment: "neutral", lang: "en", occasions: ["Dinner", "With friends"] }, () => 0);
 assert.match(both, /Came for dinner, with friends./);
-const enOcc = templateDraft(b, { picks: [], items: [], sentiment: "positive", lang: "en", occasions: ["With family"], note: "Great for kids" });
+const enOcc = templateDraft(b, { picks: [], items: [], sentiment: "positive", lang: "en", occasions: ["With family"], note: "Great for kids" }, () => 0);
 assert.equal(enOcc, "Had a good time at Chai Khana in Lahore. Came with family. Great for kids. Would come back.");
 console.log("review.test roman/occasion: ok");
+
+// Same inputs, different wording: openings and closings vary, the customer's points stay.
+{
+  const input = { picks: [], items: ["Zinger roll"], sentiment: "positive" as const, lang: "en" as const };
+  const first = templateDraft(b, input, () => 0);
+  const last = templateDraft(b, input, () => 0.99);
+  assert.notEqual(first, last);
+  for (const t of [first, last]) assert.ok(t.includes("Zinger roll") && t.includes("Chai Khana") && t.includes("Lahore"), t);
+  const seen = new Set(Array.from({ length: 40 }, () => templateDraft(b, input)));
+  assert.ok(seen.size > 1, "random wording should vary");
+  console.log("review.test variety: ok");
+}
 
 assert.equal(scriptOk("Chai Khana Lahore mein dinner ke liye gaye the.", "ur"), false); // Roman Urdu where Urdu script was asked
 assert.equal(scriptOk("Chai Khana میں Zinger roll ٹھنڈا آیا اور بہت انتظار کرنا پڑا۔", "ur"), false); // English names inside Urdu are rejected

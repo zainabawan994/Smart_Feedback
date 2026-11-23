@@ -253,7 +253,7 @@ export default function Flow({ business: b }: { business: Business }) {
           )}
 
           {/* 4 · Own words */}
-          <Question n={++n} title="Anything else?" hint="optional">
+          <Question n={++n} title="Anything else?" hint="optional · a few of your own words make your review stand out">
             <textarea
               aria-label="Anything else"
               value={note}
