@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       eyebrow="Business owner · Log in"
       title="Welcome back."
       footer={
-<>No account? The SmartFeedback admin creates owner accounts.</>
+<>No account? The Tavo admin creates owner accounts.</>
       }
     >
       {plan && <PlanNote label={planLabel(plan)} />}

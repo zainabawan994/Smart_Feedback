@@ -51,7 +51,7 @@ async function trySend(email: string, purpose: "verify" | "reset") {
 /* ---------------- sign up / log in / log out ---------------- */
 
 export async function signup(): Promise<FormState> {
-  return { error: "Sign-up is closed. The SmartFeedback admin creates owner accounts." };
+  return { error: "Sign-up is closed. The Tavo admin creates owner accounts." };
 }
 
 export async function login(_: FormState, f: FormData): Promise<FormState> {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PLANS as PLAN_PRICES, rupees } from "@/lib/options";
+import Logo from "@/components/Logo";
 
 const STEPS = [
   ["Scan", "A QR card at your counter or desk opens a page. No app, no sign-up."],
@@ -34,9 +35,7 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-8">
       <nav className="flex items-center justify-between py-6">
-        <span className="font-display text-xl tracking-tight">
-          Smart<span className="text-tomato">Feedback</span>
-        </span>
+        <Logo className="h-8" />
         <div className="flex items-center gap-3 text-sm sm:gap-5">
           <a href="#pricing" className="hidden underline decoration-line underline-offset-4 hover:decoration-ink sm:inline">
             Pricing
@@ -56,7 +55,7 @@ export default function Home() {
             <em className="text-tomato">Smarter</em> reviews.
           </h1>
           <p className="mt-6 max-w-lg text-lg text-muted">
-            Happy customers mean to leave a review, then never do. SmartFeedback turns three taps into a draft in their own voice, ready to post.
+            Happy customers mean to leave a review, then never do. Tavo turns three taps into a draft in their own voice, ready to post.
           </p>
         </div>
 
@@ -137,7 +136,7 @@ export default function Home() {
           ))}
         </ul>
         <p className="mt-5 text-sm text-muted">
-          Accounts are set up by the SmartFeedback admin. Already have one?{" "}
+          Accounts are set up by the Tavo admin. Already have one?{" "}
           <Link href="/login" className="text-ink underline underline-offset-4">
             Log in
           </Link>{" "}
@@ -160,7 +159,7 @@ export default function Home() {
       </section>
 
       <footer className="flex flex-wrap justify-between gap-2 border-t border-line py-8 font-mono text-[11px] uppercase tracking-[0.18em] text-muted">
-        <span>SmartFeedback prototype</span>
+        <span>Tavo</span>
         <span>Next.js · open-source LLM normalizer</span>
       </footer>
     </main>

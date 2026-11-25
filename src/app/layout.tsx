@@ -9,7 +9,7 @@ const mono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], w
 const nastaliq = Noto_Nastaliq_Urdu({ variable: "--font-nastaliq", subsets: ["arabic"], weight: ["400", "600"] });
 
 export const metadata: Metadata = {
-  title: "SmartFeedback — Real feedback. Smarter reviews.",
+  title: "Tavo — Real feedback. Smarter reviews.",
   description: "Customers tap three things about their visit. We help them say it in their own words.",
 };
 

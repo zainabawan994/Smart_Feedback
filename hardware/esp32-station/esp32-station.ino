@@ -1,4 +1,4 @@
-// SmartFeedback station: three buttons (Loved it / Okay / Not great) that log a feeling to the owner desk.
+// Tavo station: three buttons (Loved it / Okay / Not great) that log a feeling to the owner desk.
 // Board: any ESP32 dev board (Arduino IDE: install "esp32" by Espressif in Boards Manager). No extra libraries.
 // Wiring: each button between its pin and GND (internal pull-ups are used). LED: built-in on GPIO 2.
 // Fill in the values below; SERVER_URL, SLUG and STATION_KEY are on the owner desk → QR & table card page.

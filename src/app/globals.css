@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* SmartFeedback: café order-ticket palette. Paper, ink, tomato. No gradients. */
+/* Tavo: café order-ticket palette. Paper, ink, tomato. No gradients. */
 :root {
   --paper: #f3ede2;
   --card: #fbf8f2;

@@ -4,6 +4,7 @@ import { listBusinesses } from "@/lib/store";
 import { logout } from "@/lib/actions";
 import { planState } from "@/lib/options";
 import Nav from "./Nav";
+import Logo from "@/components/Logo";
 
 export default async function AdminLayout({ children, params }: { children: React.ReactNode; params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -40,8 +41,8 @@ export default async function AdminLayout({ children, params }: { children: Reac
     <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_1fr]">
       <aside className="relative border-b border-line px-4 py-4 lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
         <div className="flex items-center justify-between gap-3 lg:block">
-          <Link href="/" className="shrink-0 font-display text-xl tracking-tight">
-            Smart<span className="text-tomato">Feedback</span>
+          <Link href="/" className="shrink-0" aria-label="Tavo home">
+            <Logo className="h-7" />
           </Link>
           <div className="min-w-0 flex-1 lg:mt-6">{switcher}</div>
           <Nav slug={slug} />
@@ -79,7 +80,7 @@ export default async function AdminLayout({ children, params }: { children: Reac
           <div className="mx-auto max-w-xl px-4 py-16 text-center">
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-plum">Account paused</p>
             <h1 className="mt-3 font-display text-4xl tracking-tight">{business.name} is suspended</h1>
-            <p className="mt-3 text-muted">Your customer page is switched off and the desk is paused. Contact SmartFeedback support to turn it back on.</p>
+            <p className="mt-3 text-muted">Your customer page is switched off and the desk is paused. Contact Tavo support to turn it back on.</p>
           </div>
         ) : (
           children

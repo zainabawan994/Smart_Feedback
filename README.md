@@ -1,4 +1,6 @@
-# SmartFeedback
+# Tavo
+
+(Formerly SmartFeedback.) Logo files: `../Tavo logo/` (SVG and PNG); in the app it is `src/components/Logo.tsx`.
 
 Customers scan a table QR code, tap how it went and up to three things that stood out, and get a short draft they edit and post on Google themselves.
 

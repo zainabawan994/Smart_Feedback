@@ -11,7 +11,7 @@ export default function NotFound() {
         <p className="urdu mt-2 text-muted" dir="rtl">یہ لنک درست نہیں۔ عملے سے نیا کارڈ مانگیں۔</p>
       </div>
       <Link href="/" className="mt-8 self-start rounded-full border border-ink px-5 py-3 text-sm transition hover:bg-ink hover:text-paper">
-        Go to SmartFeedback
+        Go to Tavo
       </Link>
     </main>
   );

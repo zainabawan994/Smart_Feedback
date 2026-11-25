@@ -7,6 +7,7 @@ import type { FormState } from "@/lib/actions";
 import { shrinkImage } from "@/lib/image";
 import { BUSINESS_TYPES } from "@/lib/business-types";
 import { EMAIL_PATTERN } from "@/lib/options";
+import Logo from "@/components/Logo";
 
 export const inputCls = "w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-[15px] outline-none transition focus:border-ink";
 
@@ -200,8 +201,8 @@ export function ResendButton({ action }: { action: () => Promise<FormState> }) {
 export function AuthCard({ eyebrow, title, children, footer }: { eyebrow: string; title: string; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-10">
-      <Link href="/" className="mb-8 font-display text-xl tracking-tight">
-        Smart<span className="text-tomato">Feedback</span>
+      <Link href="/" className="mb-8 self-start" aria-label="Tavo home">
+        <Logo className="h-8" />
       </Link>
       <div className="ticket rounded-t-2xl border-x border-t border-line p-6">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">{eyebrow}</p>

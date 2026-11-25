@@ -74,7 +74,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
           <form action={cancelPlan} className="flex flex-wrap items-center justify-between gap-3">
             <input type="hidden" name="slug" value={slug} />
             <p className="max-w-xl text-sm text-muted">
-              Cancel plan: your desk keeps working until {day(b.planExpiresAt!)}, then the plan is not renewed. For a refund of the remaining time, contact SmartFeedback support.
+              Cancel plan: your desk keeps working until {day(b.planExpiresAt!)}, then the plan is not renewed. For a refund of the remaining time, contact Tavo support.
             </p>
             <button className="rounded-full border border-plum px-4 py-2 text-sm text-plum transition hover:bg-plum hover:text-paper">Cancel plan</button>
           </form>
@@ -145,7 +145,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
 
       {platformOwner && !readOnly && (
         <section className={`${card} mt-6`}>
-          <h2 className="font-display text-2xl">You run SmartFeedback</h2>
+          <h2 className="font-display text-2xl">You run Tavo</h2>
           <p className="mt-1 text-sm text-muted">As super admin you don&apos;t buy plans for your own businesses. Set this one&apos;s plan directly.</p>
           <Link href={`/superadmin/${slug}`} className="mt-4 inline-block rounded-full bg-ink px-5 py-2.5 text-sm text-paper transition hover:opacity-90">
             Set plan in super admin →

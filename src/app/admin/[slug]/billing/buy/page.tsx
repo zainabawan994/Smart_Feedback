@@ -71,7 +71,7 @@ export default async function BuyPlanPage({ params, searchParams }: { params: Pr
           <Link href={back} className="underline underline-offset-4">See Plan &amp; billing</Link>
         </p>
       ) : accounts.length === 0 ? (
-        <p className={`${card} mt-6 text-sm text-muted`}>Payment details will be added here soon. Contact SmartFeedback support to buy a plan.</p>
+        <p className={`${card} mt-6 text-sm text-muted`}>Payment details will be added here soon. Contact Tavo support to buy a plan.</p>
       ) : (
         <section className={`${card} mt-6`}>
           <div className="grid gap-8 lg:grid-cols-2">

@@ -3,7 +3,7 @@ import nodemailer, { type Transporter } from "nodemailer";
 
 // Transactional email over SMTP (Gmail, Outlook, your host's mail server…). Set:
 //   SMTP_HOST, SMTP_PORT (465 = SSL, 587 = STARTTLS), SMTP_USER, SMTP_PASS
-//   EMAIL_FROM (optional, e.g. "SmartFeedback <you@gmail.com>"; defaults to SMTP_USER)
+//   EMAIL_FROM (optional, e.g. "Tavo <you@gmail.com>"; defaults to SMTP_USER)
 // With no SMTP_HOST, development prints the email to the server log; production refuses.
 
 export type Mail = { to: string; subject: string; text: string; html: string };
@@ -44,7 +44,7 @@ ${mail.text}
     return;
   }
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) throw new Error("SMTP_USER and SMTP_PASS must be set");
-  const from = process.env.EMAIL_FROM || `SmartFeedback <${process.env.SMTP_USER}>`;
+  const from = process.env.EMAIL_FROM || `Tavo <${process.env.SMTP_USER}>`;
   let info;
   try {
     info = await (await transport()).sendMail({ from, to: mail.to, subject: mail.subject, text: mail.text, html: mail.html });
@@ -62,17 +62,17 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 export function codeEmail(kind: "verify" | "reset", code: string, to: string): Mail {
   const lines =
     kind === "verify"
-      ? { subject: `${code} is your SmartFeedback code`, title: "Confirm your email", body: "Enter this code to finish setting up your owner desk.", ur: "اپنا ای میل تصدیق کرنے کے لیے یہ کوڈ درج کریں۔" }
+      ? { subject: `${code} is your Tavo code`, title: "Confirm your email", body: "Enter this code to finish setting up your owner desk.", ur: "اپنا ای میل تصدیق کرنے کے لیے یہ کوڈ درج کریں۔" }
       : { subject: `${code} is your password reset code`, title: "Reset your password", body: "Enter this code to choose a new password.", ur: "نیا پاس ورڈ بنانے کے لیے یہ کوڈ درج کریں۔" };
   const footer = "The code expires in 10 minutes. If you didn't ask for it, ignore this email; nothing changes.";
   return {
     to,
     subject: lines.subject,
-    text: `${lines.title}\n\n${lines.body}\n\n    ${code}\n\n${footer}\n\nSmartFeedback · Real feedback. Smarter reviews.`,
+    text: `${lines.title}\n\n${lines.body}\n\n    ${code}\n\n${footer}\n\nTavo · Real feedback. Smarter reviews.`,
     html: `<!doctype html><html><body style="margin:0;background:#f3ede2;padding:32px 16px;font-family:Georgia,serif;color:#1c1a16">
 <table role="presentation" width="100%" style="max-width:440px;margin:0 auto;background:#fbf8f2;border:1px solid #d8cfbf;border-radius:16px">
 <tr><td style="padding:28px">
-<p style="margin:0;font:12px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:#6f675b">SmartFeedback</p>
+<p style="margin:0;font:12px/1 monospace;letter-spacing:.18em;text-transform:uppercase;color:#6f675b">Tavo</p>
 <hr style="border:0;border-top:1px dashed #d8cfbf;margin:16px 0">
 <h1 style="margin:0 0 8px;font-size:26px;font-weight:normal">${esc(lines.title)}</h1>
 <p style="margin:0;font:15px/1.5 Arial,sans-serif;color:#6f675b">${esc(lines.body)}</p>

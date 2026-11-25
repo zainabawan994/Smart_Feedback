@@ -19,7 +19,7 @@ export default async function NoBusinessPage() {
         </form>
       }
     >
-      <p className="text-muted">Your account has no business linked to it. Ask the SmartFeedback admin to add one for you.</p>
+      <p className="text-muted">Your account has no business linked to it. Ask the Tavo admin to add one for you.</p>
     </AuthCard>
   );
 }
