@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { adminEmails, requireSuperAdmin } from "@/lib/auth";
-import { decidePaymentAction, superAdminSetupAdmin } from "@/lib/actions";
+import { adminEmails, allAdminEmails, requireSuperAdmin } from "@/lib/auth";
+import { decidePaymentAction, superAdminAddAdmin, superAdminRemoveAdmin, superAdminSetupAdmin } from "@/lib/actions";
 import { blockedReviewCounts, getUserByEmail, listPayments, listPlatformBusinesses, listPlatformUsers } from "@/lib/store";
 import { ActionForm, Field } from "@/components/forms";
 import { PageHeader, card, day, eyebrow, when } from "../admin/[slug]/ui";
@@ -11,7 +11,8 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
   const { deleted } = await searchParams;
   const user = await requireSuperAdmin();
   const [businesses, users, pending, blockedBy] = await Promise.all([listPlatformBusinesses(), listPlatformUsers(), listPayments({ status: "pending" }), blockedReviewCounts()]);
-  const team = await Promise.all(adminEmails().map(async (email) => ({ email, user: await getUserByEmail(email) })));
+  const mainAdmins = adminEmails();
+  const team = await Promise.all((await allAdminEmails()).map(async (email) => ({ email, main: mainAdmins.includes(email), user: await getUserByEmail(email) })));
   const nameOf = (slug: string) => businesses.find((b) => b.slug === slug)?.name ?? slug;
   const states = businesses.map((b) => planState(b));
   const totals = [
@@ -54,16 +55,22 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
 
       <section className={`${card} mt-6`} id="team" aria-label="Team admins">
         <h2 className="font-display text-2xl">Team admins</h2>
-        <p className="mt-1 text-sm text-muted">
-          Everyone here has full admin access. To add a teammate: put their email in <span className="font-mono text-ink">SUPER_ADMIN_EMAILS</span> in the hosting settings
-          (Vercel → Settings → Environment Variables, emails separated by commas), redeploy, then set their password here.
-        </p>
+        <p className="mt-1 text-sm text-muted">Everyone here has full admin access. To add a teammate, type their email and a password, then click Add admin. They can log in at once at /superadmin/login.</p>
+        <div className="mt-4 max-w-xl rounded-xl border border-ink bg-paper p-4">
+          <ActionForm action={superAdminAddAdmin} submit="Add admin">
+            <Field label="Teammate's email" name="email" type="email" autoComplete="off" required />
+            <Field label="Password for them" hint="8+ characters" name="password" type="password" autoComplete="new-password" minLength={8} required />
+          </ActionForm>
+        </div>
         <ul className="mt-4 grid gap-3 md:grid-cols-2">
-          {team.map(({ email, user: u }) => (
+          {team.map(({ email, main, user: u }) => (
             <li key={email} className="rounded-xl border border-line bg-paper p-4">
               <p className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span className="font-medium">{email}</span>
-                <span className={u ? "text-leaf" : "text-tomato"}>{u ? (email === user.email.toLowerCase() ? "✓ you" : "✓ has an account") : "no account yet"}</span>
+                <span className={u ? "text-leaf" : "text-tomato"}>
+                  {u ? (email === user.email.toLowerCase() ? "✓ you" : "✓ has an account") : "no account yet"}
+                  {main && <span className="ml-2 text-muted">· main admin</span>}
+                </span>
               </p>
               {email !== user.email.toLowerCase() && (
                 <div className="mt-3">
@@ -71,6 +78,12 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
                     <input type="hidden" name="email" value={email} />
                     <Field label={u ? "New password" : "Password"} hint="8+ characters" name="password" type="password" autoComplete="new-password" minLength={8} required />
                   </ActionForm>
+                  {!main && (
+                    <form action={superAdminRemoveAdmin} className="mt-2 text-right">
+                      <input type="hidden" name="email" value={email} />
+                      <button className="text-sm text-plum underline underline-offset-4">Remove admin access</button>
+                    </form>
+                  )}
                 </div>
               )}
             </li>

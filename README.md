@@ -13,7 +13,7 @@ npm test        # normalizer + stats checks
 - Customer page: `/r/chai-khana`
 - Owner desk: `/signup` to create your own business, then `/login`. Without Supabase (local `data/db.json` only), a demo owner for the demo café is created automatically; see `DEMO_OWNER` in `src/lib/store.ts`. It is never copied to Supabase.
 - Demo mode: `npm run dev:demo` (port 3011) uses `data/demo.json`, prints emails to the log and never touches Supabase. It creates a dummy main admin: log in at `/superadmin/login` with `admin@smartfeedback.test` / `admin-demo-2026` (`DEMO_ADMIN` in `src/lib/store.ts`). The demo owner above works at `/login`. A second team admin, `teammate@smartfeedback.test`, is listed too: give it a password from the admin panel → Team admins (e.g. `teammate-demo-2026`).
-- Team admins (live site): every email in `SUPER_ADMIN_EMAILS` (comma-separated, in Vercel → Settings → Environment Variables) has full admin access. After adding an email and redeploying, set its password in the admin panel → Team admins.
+- Team admins: the main admin's email is `SUPER_ADMIN_EMAILS` (Vercel → Settings → Environment Variables). More admins are added straight from the admin panel → Team admins → Add admin (email + password); no hosting change needed.
 
 Works with no config: template draft, rule-based tidy-up, data in `data/db.json`.
 

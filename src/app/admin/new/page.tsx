@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { isSuperAdmin, sessionUser } from "@/lib/auth";
+import { isAdmin, sessionUser } from "@/lib/auth";
 import { logout } from "@/lib/actions";
 import { AuthCard } from "@/components/forms";
 
@@ -8,7 +8,7 @@ export default async function NoBusinessPage() {
   const user = await sessionUser();
   if (!user) redirect("/login");
   if (!user.emailVerified) redirect("/verify");
-  if (isSuperAdmin(user)) redirect("/superadmin/new");
+  if (await isAdmin(user)) redirect("/superadmin/new");
   return (
     <AuthCard
       eyebrow="Business owner"

@@ -3,7 +3,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { hmac } from "./secret.ts";
-import { getBusiness, getLoginAttempts, getUserById, putLoginAttempts, type Business, type User } from "./store";
+import { getBusiness, getLoginAttempts, getUserById, listTeamAdmins, putLoginAttempts, type Business, type User } from "./store";
 
 const COOKIE = "sf_session";
 const MAX_AGE = 60 * 60 * 24 * 14; // 14 days
@@ -44,20 +44,26 @@ export async function currentUser(): Promise<User | null> {
   return user?.emailVerified ? user : null;
 }
 
-/** Admin emails from SUPER_ADMIN_EMAILS (comma-separated). Only the hosting settings can add one, never the app. */
+/** Main admins from SUPER_ADMIN_EMAILS (comma-separated). They can't be removed from the panel. */
 export const adminEmails = () =>
   (process.env.SUPER_ADMIN_EMAILS ?? "").split(/[,;\s]+/).map((e) => e.replace(/["']/g, "").trim().toLowerCase()).filter(Boolean); // quotes, spaces or ";" pasted by mistake are fine
 
-/** Main admins (the team): verified accounts whose email is listed in SUPER_ADMIN_EMAILS. */
-export function isSuperAdmin(user: Pick<User, "email" | "emailVerified"> | null) {
-  return Boolean(user?.emailVerified && adminEmails().includes(user.email.toLowerCase()));
+/** Everyone with admin access: the main admins plus team admins added in the admin panel. */
+export const allAdminEmails = cache(async (): Promise<string[]> => {
+  const team = await listTeamAdmins().catch((e) => (console.error("[admins] could not read team admins:", (e as Error).message), [] as string[]));
+  return [...new Set([...adminEmails(), ...team])];
+});
+
+/** Admin = a verified account whose email is a main admin or a team admin. Always await it. */
+export async function isAdmin(user: Pick<User, "email" | "emailVerified"> | null) {
+  return Boolean(user?.emailVerified && (await allAdminEmails()).includes(user.email.toLowerCase()));
 }
 
 /** For super-admin pages. Everyone else gets a 404, so the page doesn't reveal it exists. */
 export const requireSuperAdmin = cache(async (): Promise<User> => {
   const user = await sessionUser();
   if (!user) redirect("/superadmin/login");
-  if (!isSuperAdmin(user)) notFound();
+  if (!(await isAdmin(user))) notFound();
   return user;
 });
 
@@ -69,7 +75,7 @@ export const requireOwnerPage = cache(async (slug: string): Promise<{ user: User
   if (!user) redirect(`/login?next=/admin/${encodeURIComponent(slug)}`);
   if (!user.emailVerified) redirect("/verify");
   if (!business) redirect("/admin");
-  if (isSuperAdmin(user)) return { user, business, readOnly: false, asAdmin: true };
+  if (await isAdmin(user)) return { user, business, readOnly: false, asAdmin: true };
   if (business.ownerId === user.id) return { user, business, readOnly: false, asAdmin: false };
   redirect("/admin");
 });
@@ -78,7 +84,7 @@ export const requireOwnerPage = cache(async (slug: string): Promise<{ user: User
 export async function ownedBusiness(slug: string) {
   const [user, business] = await Promise.all([currentUser(), getBusiness(slug)]);
   if (!user || !business) return null;
-  if (isSuperAdmin(user)) return business; // platform admin manages every business, suspended or not
+  if (await isAdmin(user)) return business; // platform admin manages every business, suspended or not
   return business.ownerId === user.id && !business.suspended ? business : null;
 }
 

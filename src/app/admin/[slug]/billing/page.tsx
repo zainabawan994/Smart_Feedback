@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { isSuperAdmin, requireOwnerPage } from "@/lib/auth";
+import { isAdmin, requireOwnerPage } from "@/lib/auth";
 import { cancelPayment, cancelPlan } from "@/lib/actions";
 import { listPayments, type Payment } from "@/lib/store";
 import { PAYMENT_METHODS, PLANS, asPlan, daysUntil, isFuture, planLabel, planState, rupees } from "@/lib/options";
@@ -23,7 +23,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
   if (picked) redirect(`/admin/${slug}/billing/buy?plan=${picked}`); // old "?plan=" links go straight to checkout
   const { user, business: b, asAdmin: readOnly } = await requireOwnerPage(slug);
   // The platform owner doesn't pay herself: her businesses get plans straight from the super-admin panel.
-  const platformOwner = isSuperAdmin(user);
+  const platformOwner = await isAdmin(user);
   const payments = await listPayments({ slug }, 50);
   const pending = payments.find((p) => p.status === "pending");
   const lastPaid = payments.find((p) => p.status === "approved");

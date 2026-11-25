@@ -127,7 +127,7 @@ const toRow = (b: Partial<Business>) => {
 
 // shortcut: single JSON file, no concurrency control. Fine for a demo; set SUPABASE_* for anything real.
 const FILE = path.resolve(process.cwd(), process.env.DATA_FILE || path.join("data", "db.json")); // demo mode uses its own file
-type DB = { businesses: Record<string, Business>; events: Record<string, Event[]>; users: Record<string, User>; drafts: Record<string, Draft[]>; codes: Record<string, Code>; insights: Record<string, Insight>; logins: Record<string, LoginAttempts>; payments: Payment[] };
+type DB = { businesses: Record<string, Business>; events: Record<string, Event[]>; users: Record<string, User>; drafts: Record<string, Draft[]>; codes: Record<string, Code>; insights: Record<string, Insight>; logins: Record<string, LoginAttempts>; payments: Payment[]; admins?: string[] };
 
 const seed: Business = {
   slug: "chai-khana",
@@ -357,6 +357,40 @@ export async function blockedReviewCounts(): Promise<Record<string, number>> {
   }
   for (const [key, v] of localHits) if (key.startsWith("flag:") && v.reset > Date.now()) out[key.slice(5)] = v.n;
   return out;
+}
+
+/* ---- team admins added from the admin panel ---- */
+// shortcut: on Supabase they are rows in rate_limits ("team-admin:<email>", reset_at in year 9999 so the cleanup
+// never removes them). No schema change needed; move to an "admins" table if roles ever grow.
+const TEAM_KEY = "team-admin:";
+const FOREVER = "9999-12-31T00:00:00Z";
+
+export async function listTeamAdmins(): Promise<string[]> {
+  if (useSupabase) {
+    const rows: { key: string }[] = await sb(`rate_limits?key=like.${encodeURIComponent(TEAM_KEY)}*&select=key`);
+    return rows.map((r) => r.key.slice(TEAM_KEY.length));
+  }
+  return (await load()).admins ?? [];
+}
+
+export async function addTeamAdmin(email: string) {
+  if (useSupabase) {
+    await sb("rate_limits?on_conflict=key", { method: "POST", body: JSON.stringify({ key: TEAM_KEY + email, n: 1, reset_at: FOREVER }), headers: { Prefer: "resolution=merge-duplicates,return=minimal" } });
+    return;
+  }
+  const db = await load();
+  db.admins = [...new Set([...(db.admins ?? []), email])];
+  await save(db);
+}
+
+export async function removeTeamAdmin(email: string) {
+  if (useSupabase) {
+    await sb(`rate_limits?key=eq.${encodeURIComponent(TEAM_KEY + email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    return;
+  }
+  const db = await load();
+  db.admins = (db.admins ?? []).filter((e) => e !== email);
+  await save(db);
 }
 
 /* ---- payments (manual transfers) ---- */

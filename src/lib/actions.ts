@@ -3,9 +3,9 @@
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { adminEmails, clearLoginFailures, currentUser, endSession, isSuperAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
+import { adminEmails, allAdminEmails, clearLoginFailures, currentUser, endSession, isAdmin, loginBlocked, noteLoginFailure, sessionUser, startSession } from "./auth";
 import { CHECK_MESSAGE, checkCode, issueCode } from "./codes.ts";
-import { createBusiness, createPayment, createUser, deleteBusiness, getBusiness, getPayment, getUserByEmail, getUserById, setBusinessOwner, setPaymentStatus, updateBusiness, updateUser } from "./store";
+import { addTeamAdmin, createBusiness, createPayment, createUser, deleteBusiness, removeTeamAdmin, getBusiness, getPayment, getUserByEmail, getUserById, setBusinessOwner, setPaymentStatus, updateBusiness, updateUser } from "./store";
 import { paymentAccounts } from "./billing.ts";
 import { hashPassword, verifyPassword } from "./password.ts";
 import { normalizeKind } from "./business-types.ts";
@@ -74,7 +74,7 @@ export async function login(_: FormState, f: FormData): Promise<FormState> {
   }
   // Three screens: the main admin goes to the admin panel, owners go to their own desk.
   const next = safeNext(str(f, "next", 200));
-  if (isSuperAdmin(user)) redirect(next.startsWith("/superadmin") ? next : "/superadmin");
+  if (await isAdmin(user)) redirect(next.startsWith("/superadmin") ? next : "/superadmin");
   const plan = asPlan(f.get("plan"));
   redirect(plan ? `/admin/plan?plan=${plan}` : next.startsWith("/superadmin") ? "/admin" : next);
 }
@@ -255,7 +255,7 @@ export async function cancelPlan(f: FormData) {
 /** Super-admin: approve / reject a pending payment, or mark an approved one refunded. */
 export async function decidePaymentAction(f: FormData) {
   const user = await currentUser();
-  if (!isSuperAdmin(user)) return;
+  if (!(await isAdmin(user))) return;
   const id = str(f, "id", 60);
   const decision = String(f.get("decision"));
   const typed = str(f, "note", 200);
@@ -288,7 +288,7 @@ export async function decidePaymentAction(f: FormData) {
 /** Suspend / resume a business and set its plan. Expiry left empty = today + the plan's length. */
 export async function superAdminUpdateBusiness(_: FormState, f: FormData): Promise<FormState> {
   const user = await currentUser();
-  if (!isSuperAdmin(user)) return { error: "Not allowed." };
+  if (!(await isAdmin(user))) return { error: "Not allowed." };
   const slug = str(f, "slug", 40);
   if (!(await getBusiness(slug))) return { error: "Business not found." };
   const planKey = str(f, "plan", 20);
@@ -315,7 +315,7 @@ export async function superAdminUpdateBusiness(_: FormState, f: FormData): Promi
  *  password (they verify their email on first login); an existing owner just gets the extra business. */
 export async function addBusiness(_: FormState, f: FormData): Promise<FormState> {
   const user = await currentUser();
-  if (!isSuperAdmin(user)) return { error: "Not allowed." };
+  if (!(await isAdmin(user))) return { error: "Not allowed." };
   const email = str(f, "ownerEmail").toLowerCase();
   const bad = emailProblem(email);
   if (bad) return { error: `Owner email: ${bad}` };
@@ -335,7 +335,7 @@ export async function addBusiness(_: FormState, f: FormData): Promise<FormState>
 
 /** Super admin: give a business to an owner by email. A new email gets an account with the given password. */
 export async function superAdminSetOwner(_: FormState, f: FormData): Promise<FormState> {
-  if (!isSuperAdmin(await currentUser())) return { error: "Not allowed." };
+  if (!(await isAdmin(await currentUser()))) return { error: "Not allowed." };
   const slug = str(f, "slug", 40);
   if (!(await getBusiness(slug))) return { error: "Business not found." };
   const email = str(f, "ownerEmail").toLowerCase();
@@ -356,7 +356,7 @@ export async function superAdminSetOwner(_: FormState, f: FormData): Promise<For
 
 /** Super admin: set a new password for this business's owner (logs them out everywhere), and/or vouch for their email. */
 export async function superAdminOwnerAccount(_: FormState, f: FormData): Promise<FormState> {
-  if (!isSuperAdmin(await currentUser())) return { error: "Not allowed." };
+  if (!(await isAdmin(await currentUser()))) return { error: "Not allowed." };
   const business = await getBusiness(str(f, "slug", 40));
   const owner = business?.ownerId ? await getUserById(business.ownerId) : null;
   if (!owner) return { error: "This business has no owner yet." };
@@ -374,7 +374,7 @@ export async function superAdminOwnerAccount(_: FormState, f: FormData): Promise
 
 /** Super admin: permanently delete a business. The admin must type the business's slug to confirm. */
 export async function superAdminDeleteBusiness(_: FormState, f: FormData): Promise<FormState> {
-  if (!isSuperAdmin(await currentUser())) return { error: "Not allowed." };
+  if (!(await isAdmin(await currentUser()))) return { error: "Not allowed." };
   const slug = str(f, "slug", 40);
   if (!(await getBusiness(slug))) return { error: "Business not found." };
   if (str(f, "confirm", 40) !== slug) return { error: `Type ${slug} exactly to confirm.` };
@@ -386,9 +386,9 @@ export async function superAdminDeleteBusiness(_: FormState, f: FormData): Promi
 /** Admin: set the password for a team admin (an email listed in SUPER_ADMIN_EMAILS). Creates the account if it
  *  doesn't exist yet and marks it verified, so the teammate can log in from any phone straight away. */
 export async function superAdminSetupAdmin(_: FormState, f: FormData): Promise<FormState> {
-  if (!isSuperAdmin(await currentUser())) return { error: "Not allowed." };
+  if (!(await isAdmin(await currentUser()))) return { error: "Not allowed." };
   const email = str(f, "email").toLowerCase();
-  if (!adminEmails().includes(email)) return { error: "That email isn't in SUPER_ADMIN_EMAILS on the hosting settings." };
+  if (!(await allAdminEmails()).includes(email)) return { error: "That email isn't an admin." };
   const pw = newPassword(f);
   if ("error" in pw) return pw;
   const existing = await getUserByEmail(email);
@@ -397,4 +397,32 @@ export async function superAdminSetupAdmin(_: FormState, f: FormData): Promise<F
   await updateUser(user.id, existing ? { passwordHash: hashPassword(pw.password), emailVerified: true } : { emailVerified: true });
   revalidatePath("/superadmin");
   return { info: `${email} can now log in at /superadmin/login with this password. Share it privately.` };
+}
+
+/** Admin: make someone an admin straight from the panel (no hosting settings needed). Creates their account,
+ *  or updates the password of an existing one, and marks it verified so they can log in at once. */
+export async function superAdminAddAdmin(_: FormState, f: FormData): Promise<FormState> {
+  if (!(await isAdmin(await currentUser()))) return { error: "Not allowed." };
+  const email = str(f, "email").toLowerCase();
+  const bad = emailProblem(email);
+  if (bad) return { error: bad };
+  const pw = newPassword(f);
+  if ("error" in pw) return pw;
+  const existing = await getUserByEmail(email);
+  const user = existing ?? (await createUser(email, pw.password));
+  if (!user) return { error: "Could not create that account." };
+  await updateUser(user.id, existing ? { passwordHash: hashPassword(pw.password), emailVerified: true } : { emailVerified: true });
+  await addTeamAdmin(email);
+  revalidatePath("/superadmin");
+  return { info: `${email} is now an admin. They log in at /superadmin/login with this password. Share it privately.` };
+}
+
+/** Admin: take admin access away from a team admin (main admins from the hosting settings can't be removed here). */
+export async function superAdminRemoveAdmin(f: FormData) {
+  const me = await currentUser();
+  if (!(await isAdmin(me))) return;
+  const email = str(f, "email").toLowerCase();
+  if (adminEmails().includes(email) || email === me!.email.toLowerCase()) return;
+  await removeTeamAdmin(email);
+  revalidatePath("/superadmin");
 }
