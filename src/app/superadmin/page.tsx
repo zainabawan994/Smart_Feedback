@@ -30,9 +30,14 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
       <TopBar email={user.email} />
       <div className="mt-8">
         <PageHeader eyebrow="Whole platform" title="All businesses">
-          <Link href="/superadmin/new" className="rounded-full bg-ink px-5 py-2.5 text-sm text-paper transition hover:opacity-90">
-            + Add business &amp; owner
-          </Link>
+          <span className="flex flex-wrap gap-2">
+            <a href="#team" className="rounded-full border border-ink px-5 py-2.5 text-sm transition hover:bg-ink hover:text-paper">
+              Team admins ({team.length})
+            </a>
+            <Link href="/superadmin/new" className="rounded-full bg-ink px-5 py-2.5 text-sm text-paper transition hover:opacity-90">
+              + Add business &amp; owner
+            </Link>
+          </span>
         </PageHeader>
       </div>
 
@@ -45,6 +50,32 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
             <p className="mt-1 font-display text-3xl tabular-nums">{t.n}</p>
           </div>
         ))}
+      </section>
+
+      <section className={`${card} mt-6`} id="team" aria-label="Team admins">
+        <h2 className="font-display text-2xl">Team admins</h2>
+        <p className="mt-1 text-sm text-muted">
+          Everyone here has full admin access. To add a teammate: put their email in <span className="font-mono text-ink">SUPER_ADMIN_EMAILS</span> in the hosting settings
+          (Vercel → Settings → Environment Variables, emails separated by commas), redeploy, then set their password here.
+        </p>
+        <ul className="mt-4 grid gap-3 md:grid-cols-2">
+          {team.map(({ email, user: u }) => (
+            <li key={email} className="rounded-xl border border-line bg-paper p-4">
+              <p className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="font-medium">{email}</span>
+                <span className={u ? "text-leaf" : "text-tomato"}>{u ? (email === user.email.toLowerCase() ? "✓ you" : "✓ has an account") : "no account yet"}</span>
+              </p>
+              {email !== user.email.toLowerCase() && (
+                <div className="mt-3">
+                  <ActionForm action={superAdminSetupAdmin} submit={u ? "Reset password" : "Create account"}>
+                    <input type="hidden" name="email" value={email} />
+                    <Field label={u ? "New password" : "Password"} hint="8+ characters" name="password" type="password" autoComplete="new-password" minLength={8} required />
+                  </ActionForm>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
       </section>
 
       {pending.length > 0 && (
@@ -133,32 +164,6 @@ export default async function SuperAdmin({ searchParams }: { searchParams: Promi
             </tbody>
           </table>
         </div>
-      </section>
-
-      <section className={`${card} mt-6`} aria-label="Team admins">
-        <h2 className="font-display text-2xl">Team admins</h2>
-        <p className="mt-1 text-sm text-muted">
-          Everyone here has full admin access. To add a teammate: put their email in <span className="font-mono text-ink">SUPER_ADMIN_EMAILS</span> in the hosting settings
-          (Vercel → Settings → Environment Variables, emails separated by commas), redeploy, then set their password here.
-        </p>
-        <ul className="mt-4 grid gap-3 md:grid-cols-2">
-          {team.map(({ email, user: u }) => (
-            <li key={email} className="rounded-xl border border-line bg-paper p-4">
-              <p className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span className="font-medium">{email}</span>
-                <span className={u ? "text-leaf" : "text-tomato"}>{u ? (email === user.email.toLowerCase() ? "✓ you" : "✓ has an account") : "no account yet"}</span>
-              </p>
-              {email !== user.email.toLowerCase() && (
-                <div className="mt-3">
-                  <ActionForm action={superAdminSetupAdmin} submit={u ? "Reset password" : "Create account"}>
-                    <input type="hidden" name="email" value={email} />
-                    <Field label={u ? "New password" : "Password"} hint="8+ characters" name="password" type="password" autoComplete="new-password" minLength={8} required />
-                  </ActionForm>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
       </section>
 
       <section className={`${card} mt-6 p-0`}>

@@ -45,7 +45,8 @@ export async function currentUser(): Promise<User | null> {
 }
 
 /** Admin emails from SUPER_ADMIN_EMAILS (comma-separated). Only the hosting settings can add one, never the app. */
-export const adminEmails = () => (process.env.SUPER_ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+export const adminEmails = () =>
+  (process.env.SUPER_ADMIN_EMAILS ?? "").split(/[,;\s]+/).map((e) => e.replace(/["']/g, "").trim().toLowerCase()).filter(Boolean); // quotes, spaces or ";" pasted by mistake are fine
 
 /** Main admins (the team): verified accounts whose email is listed in SUPER_ADMIN_EMAILS. */
 export function isSuperAdmin(user: Pick<User, "email" | "emailVerified"> | null) {

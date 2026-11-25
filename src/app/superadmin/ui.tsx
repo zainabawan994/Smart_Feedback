@@ -11,6 +11,9 @@ export function TopBar({ email }: { email: string }) {
         Smart<span className="text-tomato">Feedback</span> <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">main admin</span>
       </Link>
       <span className="flex items-center gap-4 text-sm">
+        <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[11px] text-muted" title="Code version running on this server">
+          version {process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local"}
+        </span>
         <span className="truncate text-muted">{email}</span>
         <form action={logout}>
           <button className="underline underline-offset-4">Log out</button>
