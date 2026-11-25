@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { isAdmin, requireOwnerPage } from "@/lib/auth";
 import { cancelPayment, cancelPlan } from "@/lib/actions";
 import { listPayments, type Payment } from "@/lib/store";
-import { PAYMENT_METHODS, PLANS, asPlan, daysUntil, isFuture, planLabel, planState, rupees } from "@/lib/options";
+import { PAYMENT_METHODS, PLANS, asPlan, daysUntil, dollars, isFuture, planLabel, planState, rupees } from "@/lib/options";
 import { StateBadge } from "@/app/superadmin/ui";
 import { PageHeader, card, day, eyebrow, page, when } from "../ui";
 
@@ -109,6 +109,7 @@ export default async function BillingPage({ params, searchParams }: { params: Pr
                     {current && <span className="rounded-full bg-leaf px-2.5 py-0.5 font-sans text-xs text-paper">Current</span>}
                   </span>
                   <span className="mt-2 font-display text-3xl tabular-nums">{rupees(p.pkr)}</span>
+                  <span className="font-mono text-xs text-muted">≈ {dollars(p.usd)} USD</span>
                   <span className="mt-1 text-sm text-muted">
                     {p.months === 1 ? "1 month" : `${p.months} months`} · {rupees(Math.round(p.pkr / p.months))} a month
                   </span>

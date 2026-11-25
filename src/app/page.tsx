@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PLANS as PLAN_PRICES, rupees } from "@/lib/options";
+import { PLANS, bestValuePlan, dollars, planMath, rupees } from "@/lib/options";
 import Logo from "@/components/Logo";
 
 const STEPS = [
@@ -15,12 +15,8 @@ const PROMISES = [
   ["The customer posts", "We never post for anyone. They read it, change it, and send it themselves."],
 ];
 
-// Every plan has every feature; longer terms just cost less per month.
-const PLANS = [
-  { key: "monthly", name: "Monthly", price: 12, period: "month", total: "Billed $12 every month", note: "Cancel any time" },
-  { key: "6months", name: "6 Months", price: 60, period: "6 months", total: "$10 a month, billed $60 every 6 months", note: "Save 17%", popular: true },
-  { key: "yearly", name: "Yearly", price: 96, period: "year", total: "$8 a month, billed $96 every year", note: "Save 33% · best value" },
-];
+// Every plan has every feature; longer terms just cost less per month. Prices come from PLANS (src/lib/options.ts).
+const PERIOD: Record<number, string> = { 1: "month", 6: "6 months", 12: "year" };
 
 const INCLUDED = [
   "Unlimited QR scans and review drafts",
@@ -106,23 +102,31 @@ export default function Home() {
             <h2 className="font-display text-3xl tracking-tight sm:text-4xl">Plans for your business</h2>
             <p className="mt-2 max-w-xl text-muted">One location per plan, every feature included. Pick how long you want to pay for; longer plans cost less each month.</p>
           </div>
-          <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Prices in USD</p>
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Prices in PKR · USD approximate</p>
         </div>
 
         <ul className="mt-8 grid gap-4 md:grid-cols-3">
-          {PLANS.map((p) => (
-            <li key={p.name} className={`relative flex flex-col rounded-2xl border bg-card p-6 ${p.popular ? "border-tomato shadow-[0_20px_40px_-25px_rgb(0_0_0/0.35)]" : "border-line"}`}>
-              {p.popular && (
-                <span className="absolute -top-3 left-6 rounded-full bg-tomato px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-tomato-ink">Most popular</span>
+          {PLANS.map((p) => {
+            const best = p.key === bestValuePlan();
+            const { perMonth, save } = planMath(p);
+            return (
+            <li key={p.key} className={`relative flex flex-col rounded-2xl border bg-card p-6 ${best ? "border-tomato shadow-[0_20px_40px_-25px_rgb(0_0_0/0.35)]" : "border-line"}`}>
+              {best && (
+                <span className="absolute -top-3 left-6 rounded-full bg-tomato px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-tomato-ink">Best value</span>
               )}
-              <h3 className="font-display text-2xl">{p.name}</h3>
-              <p className="mt-4 flex items-baseline gap-1">
-                <span className="font-display text-5xl tabular-nums">${p.price}</span>
-                <span className="text-muted">/ {p.period}</span>
+              <h3 className="font-display text-2xl">{p.label}</h3>
+              <p className="mt-4 flex flex-wrap items-baseline gap-x-1">
+                <span className="font-display text-5xl tabular-nums">{rupees(p.pkr)}</span>
+                <span className="text-muted">/ {PERIOD[p.months]}</span>
               </p>
-              <p className="mt-2 text-sm text-muted">{p.total}</p>
-              <p className="mt-1 text-sm text-muted">In Pakistan: {rupees(PLAN_PRICES.find((x) => x.key === p.key)!.pkr)} by bank transfer, Easypaisa or JazzCash</p>
-              <p className={`mt-3 w-fit rounded-full px-2.5 py-0.5 font-mono text-[11px] ${p.popular ? "bg-mustard text-ink" : "border border-line text-muted"}`}>{p.note}</p>
+              <p className="mt-1 font-mono text-sm text-muted">≈ {dollars(p.usd)} USD</p>
+              <p className="mt-2 text-sm text-muted">
+                {p.months === 1 ? `Billed ${rupees(p.pkr)} every month` : `${rupees(perMonth)} a month, billed ${rupees(p.pkr)} every ${PERIOD[p.months]}`}
+              </p>
+              <p className="mt-1 text-sm text-muted">Pay by bank transfer, Easypaisa or JazzCash</p>
+              <p className={`mt-3 w-fit rounded-full px-2.5 py-0.5 font-mono text-[11px] ${best ? "bg-mustard text-ink" : "border border-line text-muted"}`}>
+                {save > 0 ? `Save ${save}%${best ? " · best value" : ""}` : "Cancel any time"}
+              </p>
               <div className="dashed my-5" />
               <ul className="grid gap-2 text-[15px]">
                 {INCLUDED.map((f) => (
@@ -133,7 +137,8 @@ export default function Home() {
                 ))}
               </ul>
             </li>
-          ))}
+            );
+          })}
         </ul>
         <p className="mt-5 text-sm text-muted">
           Accounts are set up by the Tavo admin. Already have one?{" "}

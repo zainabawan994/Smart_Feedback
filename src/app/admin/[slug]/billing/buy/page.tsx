@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { requireOwnerPage } from "@/lib/auth";
 import { submitPayment } from "@/lib/actions";
 import { listPayments } from "@/lib/store";
-import { PLANS, asPlan, isFuture, planEnd, planInfo, rupees } from "@/lib/options";
+import { PLANS, asPlan, dollars, isFuture, planEnd, planInfo, rupees } from "@/lib/options";
 import { paymentAccounts } from "@/lib/billing";
 import { ActionForm, Field, ReceiptInput, inputCls } from "@/components/forms";
 import { PageHeader, card, day, eyebrow, page } from "../../ui";
@@ -35,6 +35,7 @@ export default async function BuyPlanPage({ params, searchParams }: { params: Pr
           <div>
             <p className={eyebrow}>You pay</p>
             <p className="mt-1 font-display text-5xl tabular-nums">{rupees(info.pkr)}</p>
+            <p className="mt-1 font-mono text-sm text-muted">≈ {dollars(info.usd)} USD</p>
             <p className="mt-1 text-sm text-muted">
               {info.months === 1 ? "1 month" : `${info.months} months`} · {rupees(Math.round(info.pkr / info.months))} a month · every feature included
             </p>

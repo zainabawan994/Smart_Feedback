@@ -95,3 +95,15 @@ console.log("options.test email: ok");
   assert.ok(normalizeKind("x".repeat(80)).length <= 40);
   console.log("options.test other kind: ok");
 }
+
+// Plan prices: per-month, saving and best value follow the numbers in PLANS.
+{
+  const { PLANS, planMath, bestValuePlan, dollars } = await import("./options.ts");
+  assert.deepEqual(PLANS.map((p) => p.pkr), [1000, 5500, 11500]);
+  assert.deepEqual(planMath(PLANS[1]), { perMonth: 917, save: 8 });
+  assert.deepEqual(planMath(PLANS[2]), { perMonth: 958, save: 4 });
+  assert.equal(bestValuePlan(), "6months");
+  assert.equal(dollars(3.6), "$3.60");
+  assert.equal(dollars(41), "$41");
+  console.log("options.test plan prices: ok");
+}

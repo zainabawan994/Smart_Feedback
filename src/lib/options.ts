@@ -53,9 +53,10 @@ export function googleLink(b: { googleReviewUrl: string; name: string; city: str
 /** Subscription plans the super-admin can set (payments are not wired up yet). */
 // pkr: what owners transfer (bank / Easypaisa / JazzCash). Matches the USD prices on the home page at about Rs 280 per dollar.
 export const PLANS = [
-  { key: "monthly", label: "Monthly", months: 1, usd: 12, pkr: 3400 },
-  { key: "6months", label: "6 Months", months: 6, usd: 60, pkr: 17000 },
-  { key: "yearly", label: "Yearly", months: 12, usd: 96, pkr: 27000 },
+  // usd is shown as an approximate price for visitors abroad (about Rs 280 per US dollar); people pay the pkr amount.
+  { key: "monthly", label: "Monthly", months: 1, usd: 3.6, pkr: 1000 },
+  { key: "6months", label: "6 Months", months: 6, usd: 19.6, pkr: 5500 },
+  { key: "yearly", label: "Yearly", months: 12, usd: 41, pkr: 11500 },
 ] as const;
 export type Plan = (typeof PLANS)[number]["key"];
 /** A plan key from a URL or form, or null if it isn't one. */
@@ -63,6 +64,13 @@ export const asPlan = (v: unknown): Plan | null => PLANS.find((p) => p.key === v
 export const planLabel = (p: Plan) => PLANS.find((x) => x.key === p)!.label;
 export const planInfo = (p: Plan) => PLANS.find((x) => x.key === p)!;
 export const rupees = (n: number) => `Rs ${n.toLocaleString("en-PK")}`;
+export const dollars = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+/** A plan's price per month and its saving (in %) against paying month by month. */
+export function planMath(p: { pkr: number; months: number }) {
+  return { perMonth: Math.round(p.pkr / p.months), save: Math.round((1 - p.pkr / (PLANS[0].pkr * p.months)) * 100) };
+}
+/** The plan with the lowest price per month. */
+export const bestValuePlan = () => PLANS.reduce((a, b) => (b.pkr / b.months < a.pkr / a.months ? b : a)).key;
 
 export const PAYMENT_METHODS = [
   { key: "bank", label: "Bank transfer" },
