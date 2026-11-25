@@ -49,7 +49,6 @@ export async function POST(req: Request) {
       return Response.json({ error: "Photo must be a JPG, PNG or WebP under about 1 MB" }, { status: 400 });
     photo = body.photo;
   }
-  if (!picks.length && !items.length && !answers.length && !note && !photo) return Response.json({ error: "Pick something or write a few words" }, { status: 400 });
 
   // Anti-fake: the owner can't write reviews for their own business, and one phone / one network can't make many.
   const user = await sessionUser();

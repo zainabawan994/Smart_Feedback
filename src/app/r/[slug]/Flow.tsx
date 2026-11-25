@@ -153,7 +153,7 @@ export default function Flow({ business: b, ownerPreview = false }: { business: 
 
   const rtl = lang === "ur";
   const questions = b.questions ?? [];
-  const ready = Boolean(sentiment) && (items.length > 0 || Object.keys(answers).length > 0 || note.trim().length > 0);
+  const ready = Boolean(sentiment); // the feeling is enough; questions, items and own words are all optional
   let n = 1; // question numbers follow what is actually shown
   const chip = (on: boolean) =>
     `rounded-full border px-4 py-2.5 text-base transition disabled:opacity-35 ${on ? "border-ink bg-ink text-paper" : "border-line bg-card hover:border-ink"}`;
@@ -290,7 +290,7 @@ export default function Flow({ business: b, ownerPreview = false }: { business: 
             </button>
           </div>
           <p className="mt-2 text-center text-sm text-muted">
-            {ready ? "We copy your review and open Google. Just paste and post." : "Answer at least one question above."}
+            {ready ? "We copy your review and open Google. Just paste and post." : "Pick how your visit was above."}
           </p>
         </>
       )}
