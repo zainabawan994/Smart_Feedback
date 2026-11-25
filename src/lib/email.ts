@@ -68,7 +68,7 @@ export function codeEmail(kind: "verify" | "reset", code: string, to: string): M
   return {
     to,
     subject: lines.subject,
-    text: `${lines.title}\n\n${lines.body}\n\n    ${code}\n\n${footer}\n\nTavo · Real feedback. Smarter reviews.`,
+    text: `${lines.title}\n\n${lines.body}\n\n    ${code}\n\n${footer}\n\nTavo · Honest voices. Smarter reviews.`,
     html: `<!doctype html><html><body style="margin:0;background:#f3ede2;padding:32px 16px;font-family:Georgia,serif;color:#1c1a16">
 <table role="presentation" width="100%" style="max-width:440px;margin:0 auto;background:#fbf8f2;border:1px solid #d8cfbf;border-radius:16px">
 <tr><td style="padding:28px">
@@ -80,7 +80,7 @@ export function codeEmail(kind: "verify" | "reset", code: string, to: string): M
 <p dir="rtl" style="margin:0 0 16px;font:15px/1.8 Arial,sans-serif;color:#6f675b">${esc(lines.ur)}</p>
 <p style="margin:0;font:13px/1.5 Arial,sans-serif;color:#6f675b">${esc(footer)}</p>
 </td></tr></table>
-<p style="text-align:center;font:11px monospace;letter-spacing:.18em;text-transform:uppercase;color:#6f675b">Real feedback. Smarter reviews.</p>
+<p style="text-align:center;font:11px monospace;letter-spacing:.18em;text-transform:uppercase;color:#6f675b">Honest voices. Smarter reviews.</p>
 </body></html>`,
   };
 }

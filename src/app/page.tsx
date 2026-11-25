@@ -31,7 +31,7 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-6xl px-4 sm:px-8">
       <nav className="flex items-center justify-between py-6">
-        <Logo className="h-8" />
+        <Logo className="h-8 translate-y-1" />
         <div className="flex items-center gap-3 text-sm sm:gap-5">
           <a href="#pricing" className="hidden underline decoration-line underline-offset-4 hover:decoration-ink sm:inline">
             Pricing
@@ -46,9 +46,9 @@ export default function Home() {
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-tomato">For every business · English + اردو</p>
           <h1 className="mt-4 font-display text-[3.2rem] leading-[0.95] tracking-tight sm:text-[5.2rem]" style={{ fontVariationSettings: "'SOFT' 100, 'opsz' 144" }}>
-            Real feedback.
+            Honest voices.
             <br />
-            <em className="text-tomato">Smarter</em> reviews.
+            <em className="text-tomato pr-[0.12em]">Smarter</em> reviews.
           </h1>
           <p className="mt-6 max-w-lg text-lg text-muted">
             Happy customers mean to leave a review, then never do. Tavo turns three taps into a draft in their own voice, ready to post.

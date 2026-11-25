@@ -351,7 +351,7 @@ export default function Flow({ business: b, ownerPreview = false }: { business: 
         </div>
       )}
 
-      <footer className="mt-auto pt-12 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-muted">Tavo · Real feedback. Smarter reviews.</footer>
+      <footer className="mt-auto pt-12 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-muted">Tavo · Honest voices. Smarter reviews.</footer>
     </main>
   );
 }
